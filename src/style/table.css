@@ -1,0 +1,45 @@
+/* src/core/styles/table.css */
+.pg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.pg-table th {
+  text-align: left;
+  background: #f8f9fb;
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+}
+
+.pg-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.pg-table-row--clickable {
+  cursor: pointer;
+}
+
+.pg-table-row--clickable:hover td {
+  background-color: #fafafa;
+}
+/* e.g. src/features/dashboard/assets/dashboard.css */
+.auction-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.auction-action-btn {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+}
+
+.auction-action-btn:hover {
+  background: #f3f4f6;
+}

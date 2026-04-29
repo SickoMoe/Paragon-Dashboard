@@ -1,0 +1,50 @@
+.tool {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-top: 1px solid #eef0f4;
+  border-bottom: 1px solid #eef0f4;
+  background: #fff;
+}
+
+.tool__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f6f7fb;
+  border: 1px solid #eef0f4;
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 320px;
+}
+
+.tool__search input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: 13px;
+
+  color: #111827;        /* ← THIS */
+  caret-color: #111827; /* ← AND THIS */
+}
+
+.tool__icon {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.tool__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tool__btn {
+  border: 1px solid #eef0f4;
+  background: #fff;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+}

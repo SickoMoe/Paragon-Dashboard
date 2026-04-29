@@ -1,0 +1,47 @@
+
+.dash {
+  padding: 28px 24px;
+  background: #f6f7fb;
+  min-height: 100vh;
+}
+
+.dash__top {
+  max-width: 1200px;
+  margin: 0 auto 12px;
+}
+
+.dash__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.dash__title {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+
+.dash__subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.dash__tabs {
+  margin-top: 10px;
+}
+
+.dash__toolbar {
+  margin-top: 12px;
+}
+
+.dash__content {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
+  overflow: hidden;
+}

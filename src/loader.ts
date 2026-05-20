@@ -6,9 +6,15 @@ export type RootLoaderData = {
 };
 
 export async function rootLoader(): Promise<RootLoaderData> {
-  const bidderApplications = await request<{ rows: any[] }>(
-    "/api/bidder/applications?status=all"
-  ).then((r) => (Array.isArray(r?.rows) ? r.rows : []));
+  try {
+    const bidderApplications = await request<{ rows: any[] }>("/api/bidder/applications?status=all").then((r) =>
+      Array.isArray(r?.rows) ? r.rows : [],
+    );
 
-  return { bidderApplications };
+    return { bidderApplications };
+  } catch (err) {
+    console.error("Failed to load bidder applications:", err);
+
+    return { bidderApplications: [] };
+  }
 }

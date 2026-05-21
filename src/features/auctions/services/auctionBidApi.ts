@@ -1,4 +1,7 @@
 // src/routes/dashboard/services/auctionBidsApi.ts
+import { request } from "../../../core/api/request";
+import { BASE_URL } from "../../../core/const";
+
 export type BidDTO = {
   id: string;
   auctionId: string;
@@ -16,14 +19,6 @@ export type AuctionLeaderboardDTO = {
   bids: BidDTO[];
 };
 
-const BASE_URL = "http://localhost:3001/api/auctions";
-
-async function request<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { "Content-Type": "application/json" } });
-  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-  return res.json();
-}
-
 export function fetchAuctionBids(auctionId: string): Promise<AuctionLeaderboardDTO> {
-  return request(`${BASE_URL}/${auctionId}/leaderboard`);
+  return request(`${BASE_URL}/auctions/${auctionId}/leaderboard`);
 }

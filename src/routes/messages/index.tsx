@@ -1,6 +1,6 @@
 // src/routes/messages/index.tsx (MessagesPage)
 import React, { useMemo, useState } from "react";
-import { useRouteLoaderData } from "react-router-dom";
+import { useRouteLoaderData, useRevalidator } from "react-router-dom";
 import { useRegisterDashboardFrame } from "../../core/useRegisterDashboardFrame";
 import { MessagesTab, MessagesTabs } from "./components/MessagesTab";
 import { MessagesToolbar } from "./components/MessagesToolbar";
@@ -68,6 +68,7 @@ function toMessageRows(apps: BidderApplicationRow[]): MessageRow[] {
 export default function MessagesPage() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<MessagesTab>("inbox");
+  const { revalidate } = useRevalidator();
 
   // ✅ filters
   const [kindFilter, setKindFilter] = useState<InboxKindFilter>("all");
@@ -225,7 +226,7 @@ export default function MessagesPage() {
         onClose={() => setSelected(null)}
         app={selected}
         onUpdated={() => {
-          // later: revalidate root loader
+          revalidate();
         }}
       />
     </div>

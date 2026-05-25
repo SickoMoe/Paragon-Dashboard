@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { useRegisterDashboardFrame } from "../../core/useRegisterDashboardFrame";
 
 export default function UsersPage() {
@@ -7,7 +7,7 @@ export default function UsersPage() {
       title: "Users",
       subtitle: "Manage accounts and roles",
     }),
-    []
+    [],
   );
 
   useRegisterDashboardFrame(frame);

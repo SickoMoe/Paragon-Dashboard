@@ -3,6 +3,8 @@
 export interface IListing {
   ownerAccountId: string;
   listingId: string;
+  moderationStatus?: "pending" | "approved" | "denied" | "removed";
+  workflowStatus?: "draft" | "submitted" | "published" | "archived";
   basicInformation: {
     title: string;
     type: string; // Residential, Commercial, Land, etc.

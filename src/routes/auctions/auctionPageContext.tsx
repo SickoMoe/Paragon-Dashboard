@@ -1,5 +1,5 @@
 // src/routes/dashboard/DashboardPageContext.tsx
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useEffect } from "react";
 import { useDashboardController } from "../../core/hooks/useDashboardController";
 import { AuctionOverview } from "../../features/auctions/types";
 
@@ -12,16 +12,12 @@ interface DashboardPageContextValue {
   closeDrawer: () => void;
 }
 
-const DashboardPageContext = createContext<DashboardPageContextValue | null>(
-  null
-);
+const DashboardPageContext = createContext<DashboardPageContextValue | null>(null);
 
 export const useDashboardPageContext = () => {
   const ctx = useContext(DashboardPageContext);
   if (!ctx) {
-    throw new Error(
-      "useDashboardPageContext must be used within AuctionPageProvider"
-    );
+    throw new Error("useDashboardPageContext must be used within AuctionPageProvider");
   }
   return ctx;
 };
@@ -31,18 +27,13 @@ interface AuctionPageProviderProps {
   children: React.ReactNode;
 }
 
-export const AuctionPageProvider: React.FC<AuctionPageProviderProps> = ({
-  initialAuctions,
-  children,
-}) => {
-  const {
-    auctions,
-    selectedAuction,
-    handleRowClick,
-    handleUpdate,
-    handleDelete,
-    closeDrawer,
-  } = useDashboardController(initialAuctions);
+export const AuctionPageProvider: React.FC<AuctionPageProviderProps> = ({ initialAuctions, children }) => {
+  const { auctions, selectedAuction, handleRowClick, handleUpdate, handleDelete, closeDrawer, replaceAuctions } =
+    useDashboardController(initialAuctions);
+
+  useEffect(() => {
+    replaceAuctions(initialAuctions);
+  }, [initialAuctions, replaceAuctions]);
 
   const value: DashboardPageContextValue = {
     auctions,
@@ -53,9 +44,5 @@ export const AuctionPageProvider: React.FC<AuctionPageProviderProps> = ({
     closeDrawer,
   };
 
-  return (
-    <DashboardPageContext.Provider value={value}>
-      {children}
-    </DashboardPageContext.Provider>
-  );
+  return <DashboardPageContext.Provider value={value}>{children}</DashboardPageContext.Provider>;
 };

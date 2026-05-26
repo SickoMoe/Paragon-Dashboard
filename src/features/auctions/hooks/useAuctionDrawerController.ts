@@ -12,44 +12,41 @@ import {
   type AuctionPatch,
 } from "../services/auctionDashboardApi";
 import { AuctionLeaderboardDTO, fetchAuctionBids } from "../services/auctionBidApi";
-import { ListingPatch, patchListing } from "../../listingApi";
+import { ListingPatch, patchListing, type ListingModerationStatus } from "../../listingApi";
 import { AuctionOverview } from "../types";
 type DrawerMode = "overview" | "edit";
 export function useAuctionDrawerController(
   row: AuctionOverview,
   onUpdate: (updated: AuctionOverview) => void,
   onDelete?: (id: string) => void,
-  onClose?: () => void
+  onClose?: () => void,
 ) {
   const [auctionLoading, setAuctionLoading] = useState(false);
   const [listingSaving, setListingSaving] = useState(false);
   const loading = auctionLoading || listingSaving;
+  const [saveSucceeded, setSaveSucceeded] = useState(false);
 
   const auction = row.auction;
 
   const [editingSchedule, setEditingSchedule] = useState(false);
-  const [startDate, setStartDate] = useState<string>(
-    auction.startDate ? toLocalInput(auction.startDate) : ""
-  );
-  const [endDate, setEndDate] = useState<string>(
-    auction.endDate ? toLocalInput(auction.endDate) : ""
-  );
+  const [startDate, setStartDate] = useState<string>(auction.startDate ? toLocalInput(auction.startDate) : "");
+  const [endDate, setEndDate] = useState<string>(auction.endDate ? toLocalInput(auction.endDate) : "");
 
   const startLabel = useMemo(
     () => (auction.startDate ? new Date(auction.startDate).toLocaleString() : "—"),
-    [auction.startDate]
+    [auction.startDate],
   );
   const endLabel = useMemo(
     () => (auction.endDate ? new Date(auction.endDate).toLocaleString() : "—"),
-    [auction.endDate]
+    [auction.endDate],
   );
   const [editingDetails, setEditingDetails] = useState(false);
   const [listingId, setListingId] = useState<string>(auction.listingId ?? "");
   const [startingBid, setStartingBid] = useState<string>(
-    auction.startingBid != null ? String(auction.startingBid) : ""
+    auction.startingBid != null ? String(auction.startingBid) : "",
   );
   const [increment, setIncrement] = useState<string>(
-    auction.rules?.bidIncrement != null ? String(auction.rules.bidIncrement) : ""
+    auction.rules?.bidIncrement != null ? String(auction.rules.bidIncrement) : "",
   );
   const [status, setStatus] = useState<IAuction["status"]>(auction.status);
 
@@ -61,6 +58,9 @@ export function useAuctionDrawerController(
   const [state, setState] = useState("");
   const [zipcode, setZipcode] = useState("");
   const [primaryImage, setPrimaryImage] = useState("");
+  const [moderationStatus, setModerationStatus] = useState<ListingModerationStatus>(
+    normalizeModerationStatus(row.listing?.moderationStatus ?? row.listing?.tags?.status),
+  );
 
   useEffect(() => {
     setEditingSchedule(false);
@@ -86,35 +86,103 @@ export function useAuctionDrawerController(
     setState(loc?.state ?? "");
     setZipcode(loc?.zipcode ?? "");
     setPrimaryImage(l?.media?.images?.[0] ?? "");
+    setModerationStatus(normalizeModerationStatus(l?.moderationStatus ?? l?.tags?.status));
   }, [auction.id]); // ok
 
   const listingLoading = false;
-const [bidsOpen, setBidsOpen] = useState(false);
-const [bidsLoading, setBidsLoading] = useState(false);
-const [bidsError, setBidsError] = useState<string | null>(null);
-const [leaderboard, setLeaderboard] = useState<AuctionLeaderboardDTO | null>(null);
+  const currentListing = listing ?? row.listing ?? null;
+  const [bidsOpen, setBidsOpen] = useState(false);
+  const [bidsLoading, setBidsLoading] = useState(false);
+  const [bidsError, setBidsError] = useState<string | null>(null);
+  const [leaderboard, setLeaderboard] = useState<AuctionLeaderboardDTO | null>(null);
 
-async function handleOpenBids() {
-  setBidsOpen(true);
+  const hasUnsavedChanges = useMemo(() => {
+    const scheduleChanged =
+      (auction.startDate ? toLocalInput(auction.startDate) : "") !== startDate ||
+      (auction.endDate ? toLocalInput(auction.endDate) : "") !== endDate;
 
-  // already loaded once? don’t re-fetch unless you want a refresh button
-  if (leaderboard) return;
+    const listingChanged =
+      (currentListing?.basicInformation?.title ?? "") !== title ||
+      (currentListing?.basicInformation?.type ?? "") !== type ||
+      (currentListing?.basicInformation?.location?.address ?? "") !== address ||
+      (currentListing?.basicInformation?.location?.city ?? "") !== city ||
+      (currentListing?.basicInformation?.location?.state ?? "") !== state ||
+      (currentListing?.basicInformation?.location?.zipcode ?? "") !== zipcode ||
+      (currentListing?.media?.images?.[0] ?? "") !== primaryImage ||
+      normalizeModerationStatus(currentListing?.moderationStatus ?? currentListing?.tags?.status) !== moderationStatus;
 
-  setBidsLoading(true);
-  setBidsError(null);
-  try {
-    const data = await fetchAuctionBids(auction.id);
-    setLeaderboard(data);
-  } catch (e: any) {
-    setBidsError(e?.message ?? "Failed to load bids");
-  } finally {
-    setBidsLoading(false);
+    const nextListingId = listingId.trim();
+    const bidRaw = startingBid.trim();
+    const incRaw = increment.trim();
+
+    const bidChanged =
+      bidRaw !== "" && Number.isFinite(Number(bidRaw)) && Number(bidRaw) !== Number(auction.startingBid ?? 0);
+
+    const incChanged =
+      incRaw !== "" && Number.isFinite(Number(incRaw)) && Number(incRaw) !== Number(auction.rules?.bidIncrement ?? 0);
+
+    const listingIdChanged = nextListingId !== (auction.listingId ?? "");
+    const statusChanged = status !== auction.status;
+
+    return scheduleChanged || listingChanged || bidChanged || incChanged || listingIdChanged || statusChanged;
+  }, [
+    auction.startDate,
+    auction.endDate,
+    auction.startingBid,
+    auction.rules?.bidIncrement,
+    auction.listingId,
+    auction.status,
+    startDate,
+    endDate,
+    row.listing,
+    listing,
+    title,
+    type,
+    address,
+    city,
+    state,
+    zipcode,
+    primaryImage,
+    moderationStatus,
+    listingId,
+    startingBid,
+    increment,
+    status,
+  ]);
+
+  function handleCancelEdit() {
+    if (!hasUnsavedChanges) {
+      onClose?.();
+      return;
+    }
+
+    const shouldDiscard = window.confirm("Discard unsaved changes?");
+    if (!shouldDiscard) return;
+
+    onClose?.();
   }
-}
 
-function handleCloseBids() {
-  setBidsOpen(false);
-}
+  async function handleOpenBids() {
+    setBidsOpen(true);
+
+    // already loaded once? don’t re-fetch unless you want a refresh button
+    if (leaderboard) return;
+
+    setBidsLoading(true);
+    setBidsError(null);
+    try {
+      const data = await fetchAuctionBids(auction.id);
+      setLeaderboard(data);
+    } catch (e: any) {
+      setBidsError(e?.message ?? "Failed to load bids");
+    } finally {
+      setBidsLoading(false);
+    }
+  }
+
+  function handleCloseBids() {
+    setBidsOpen(false);
+  }
   function mergeRow(nextAuction: IAuction): AuctionOverview {
     return {
       ...row,
@@ -156,7 +224,7 @@ function handleCloseBids() {
       const nextAuction = await updateAuctionSchedule(
         auction.id,
         new Date(startDate).toISOString(),
-        new Date(endDate).toISOString()
+        new Date(endDate).toISOString(),
       );
       onUpdate(mergeRow(nextAuction));
       setEditingSchedule(false);
@@ -222,57 +290,60 @@ function handleCloseBids() {
       setAuctionLoading(false);
     }
   }
-async function handleSaveAll() {
-  // Save schedule if valid + changed
-  const scheduleChanged =
-    (auction.startDate ? toLocalInput(auction.startDate) : "") !== startDate ||
-    (auction.endDate ? toLocalInput(auction.endDate) : "") !== endDate;
+  async function handleSaveAll() {
+    setSaveSucceeded(false);
+    // Save schedule if valid + changed
+    const scheduleChanged =
+      (auction.startDate ? toLocalInput(auction.startDate) : "") !== startDate ||
+      (auction.endDate ? toLocalInput(auction.endDate) : "") !== endDate;
 
-  // Save listing if changed (at least title here; add other fields as you want)
-  const listingChanged =
-    (row.listing?.basicInformation?.title ?? "") !== title ||
-    (row.listing?.basicInformation?.type ?? "") !== type ||
-    (row.listing?.basicInformation?.location?.address ?? "") !== address ||
-    (row.listing?.basicInformation?.location?.city ?? "") !== city ||
-    (row.listing?.basicInformation?.location?.state ?? "") !== state ||
-    (row.listing?.basicInformation?.location?.zipcode ?? "") !== zipcode ||
-    (row.listing?.media?.images?.[0] ?? "") !== primaryImage;
+    // Save listing if changed (at least title here; add other fields as you want)
+    const listingChanged =
+      (currentListing?.basicInformation?.title ?? "") !== title ||
+      (currentListing?.basicInformation?.type ?? "") !== type ||
+      (currentListing?.basicInformation?.location?.address ?? "") !== address ||
+      (currentListing?.basicInformation?.location?.city ?? "") !== city ||
+      (currentListing?.basicInformation?.location?.state ?? "") !== state ||
+      (currentListing?.basicInformation?.location?.zipcode ?? "") !== zipcode ||
+      (currentListing?.media?.images?.[0] ?? "") !== primaryImage ||
+      normalizeModerationStatus(currentListing?.moderationStatus ?? currentListing?.tags?.status) !== moderationStatus;
 
-  // Save auction details if changed
-  const nextListingId = listingId.trim();
-  const bidRaw = startingBid.trim();
-  const incRaw = increment.trim();
+    // Save auction details if changed
+    const nextListingId = listingId.trim();
+    const bidRaw = startingBid.trim();
+    const incRaw = increment.trim();
 
-  const bidChanged =
-    bidRaw !== "" &&
-    Number.isFinite(Number(bidRaw)) &&
-    Number(bidRaw) !== Number(auction.startingBid ?? 0);
+    const bidChanged =
+      bidRaw !== "" && Number.isFinite(Number(bidRaw)) && Number(bidRaw) !== Number(auction.startingBid ?? 0);
 
-  const incChanged =
-    incRaw !== "" &&
-    Number.isFinite(Number(incRaw)) &&
-    Number(incRaw) !== Number(auction.rules?.bidIncrement ?? 0);
+    const incChanged =
+      incRaw !== "" && Number.isFinite(Number(incRaw)) && Number(incRaw) !== Number(auction.rules?.bidIncrement ?? 0);
 
-  const listingIdChanged = nextListingId !== (auction.listingId ?? "");
-  const statusChanged = status !== auction.status;
+    const listingIdChanged = nextListingId !== (auction.listingId ?? "");
+    const statusChanged = status !== auction.status;
 
-  // 1) schedule
-  if (scheduleChanged) {
-    await handleScheduleSave();
+    // 1) schedule
+    if (scheduleChanged) {
+      await handleScheduleSave();
+    }
+
+    // 2) auction details
+    if (listingIdChanged || bidChanged || incChanged || statusChanged) {
+      await handleSaveDetails();
+    }
+
+    // 3) listing fields
+    if (listingChanged) {
+      await handleSaveListing();
+    }
+
+    setSaveSucceeded(true);
+    setTimeout(() => {
+      onClose?.();
+    }, 1500);
   }
-
-  // 2) auction details
-  if (listingIdChanged || bidChanged || incChanged || statusChanged) {
-    await handleSaveDetails();
-  }
-
-  // 3) listing fields
-  if (listingChanged) {
-    await handleSaveListing();
-  }
-}
   async function handleSaveListing() {
-    if (!listing) return;
+    if (!currentListing) return;
 
     const patch: ListingPatch = {
       basicInformation: {
@@ -282,14 +353,19 @@ async function handleSaveAll() {
       },
       media: {
         images: primaryImage
-          ? [primaryImage, ...(listing.media?.images ?? []).filter((x) => x !== primaryImage)]
-          : listing.media?.images ?? [],
+          ? [primaryImage, ...(currentListing.media?.images ?? []).filter((x) => x !== primaryImage)]
+          : (currentListing.media?.images ?? []),
+      },
+      moderationStatus,
+      tags: {
+        ...(currentListing.tags ?? {}),
+        status: moderationStatus,
       },
     };
 
     setListingSaving(true);
     try {
-      const updatedListing = await patchListing(listing.listingId, patch);
+      const updatedListing = await patchListing(currentListing.listingId, patch);
       setListing(updatedListing);
 
       onUpdate({
@@ -301,70 +377,83 @@ async function handleSaveAll() {
       setListingSaving(false);
     }
   }
-return {
-  row, // ✅ add this
-  // schedule
-  editingSchedule,
-  setEditingSchedule,
-  startDate,
-  setStartDate,
-  endDate,
-  setEndDate,
-  startLabel,
-  endLabel,
-  handleScheduleSave,
-handleSaveAll,
-  // listing
-  listingLoading,
-  title,
-  setTitle,
-  type,
-  setType,
-  address,
-  setAddress,
-  city,
-  setCity,
-  state,
-  setState,
-  zipcode,
-  setZipcode,
-  primaryImage,
-  setPrimaryImage,
-  handleSaveListing,
+  return {
+    row: {
+      ...row,
+      listing: currentListing,
+    },
+    // schedule
+    editingSchedule,
+    setEditingSchedule,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+    startLabel,
+    endLabel,
+    handleScheduleSave,
+    handleSaveAll,
+    // listing
+    listingLoading,
+    title,
+    setTitle,
+    type,
+    setType,
+    address,
+    setAddress,
+    city,
+    setCity,
+    state,
+    setState,
+    zipcode,
+    setZipcode,
+    primaryImage,
+    setPrimaryImage,
+    moderationStatus,
+    setModerationStatus,
+    handleSaveListing,
 
-  // details
-  editingDetails,
-  setEditingDetails,
-  listingId,
-  setListingId,
-  startingBid,
-  setStartingBid,
-  increment,
-  setIncrement,
-  status,
-  setStatus,
+    // details
+    editingDetails,
+    setEditingDetails,
+    listingId,
+    setListingId,
+    startingBid,
+    setStartingBid,
+    increment,
+    setIncrement,
+    status,
+    setStatus,
 
-  // actions
-  loading,
-  handleSaveDetails,
-  handlePublish,
-  handleEnd,
-  handleDeleteClick,
+    // actions
+    loading,
+    saveSucceeded,
+    hasUnsavedChanges,
+    handleCancelEdit,
+    handleSaveDetails,
+    handlePublish,
+    handleEnd,
+    handleDeleteClick,
 
-  // bids panel props too
-  bidsOpen,
-  bidsLoading,
-  bidsError,
-  leaderboard,
-  handleOpenBids,
-  handleCloseBids,
-};
+    // bids panel props too
+    bidsOpen,
+    bidsLoading,
+    bidsError,
+    leaderboard,
+    handleOpenBids,
+    handleCloseBids,
+  };
+}
+
+function normalizeModerationStatus(status?: string): ListingModerationStatus {
+  if (status === "pending" || status === "approved" || status === "denied" || status === "removed") {
+    return status;
+  }
+  return "pending";
 }
 
 function toLocalInput(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

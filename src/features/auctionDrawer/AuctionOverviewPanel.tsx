@@ -10,14 +10,7 @@ type Props = {
   onDelete: () => void;
 };
 
-export function AuctionOverviewPanel({
-  row,
-  onViewBids,
-  onEdit,
-  onEnd,
-  onDelete,
-  loading,
-}: Props) {
+export function AuctionOverviewPanel({ row, onViewBids, onEdit, onEnd, onDelete, loading }: Props) {
   const img = row.listing?.media?.images?.[0];
   const title = row.listing?.basicInformation?.title ?? "Untitled listing";
   const loc = row.listing?.basicInformation?.location;
@@ -35,7 +28,7 @@ export function AuctionOverviewPanel({
         <div style={{ fontSize: 13, color: "#6b7280" }}>{location}</div>
       </div>
 
-      <span >{auction.status}</span>
+      <span>{auction.status}</span>
 
       <div>
         <SummaryItem label="Starting bid" value={`$${auction.startingBid ?? 0}`} />
@@ -45,8 +38,12 @@ export function AuctionOverviewPanel({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <button style={btn.secondary} onClick={onViewBids}>View bids</button>
-        <button style={btn.primary} onClick={onEdit}>Edit auction</button>
+        <button style={btn.secondary} onClick={onViewBids}>
+          View bids
+        </button>
+        <button style={btn.primary} onClick={onEdit}>
+          Edit
+        </button>
 
         {auction.status === "live" && (
           <button style={btn.secondary} onClick={onEnd} disabled={loading}>
@@ -100,4 +97,3 @@ const btn: Record<string, React.CSSProperties> = {
     fontSize: 13,
   },
 };
-

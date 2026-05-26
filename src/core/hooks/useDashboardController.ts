@@ -1,5 +1,5 @@
 // src/routes/dashboard/controllers/useDashboardController.ts
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { IAuction } from "../../interfaces/IAuction";
 import { AuctionOverview } from "../../features/auctions/types";
 
@@ -12,24 +12,27 @@ export function useDashboardController(initialAuctions: AuctionOverview[]) {
   // drawer selection
   const [selectedAuction, setSelectedAuction] = useState<AuctionOverview | null>(null);
 
+  const replaceAuctions = useCallback((nextAuctions: AuctionOverview[]) => {
+    setAuctions(nextAuctions);
+    setSelectedAuction((prev) => {
+      if (!prev) return null;
+      return nextAuctions.find((a) => a.auction.id === prev.auction.id) ?? null;
+    });
+  }, []);
 
-const addOptimistic = (row: AuctionOverview) => {
-  setAuctions((prev) => [row, ...prev]);
-  setSelectedAuction(row);
-};
+  const addOptimistic = (row: AuctionOverview) => {
+    setAuctions((prev) => [row, ...prev]);
+    setSelectedAuction(row);
+  };
 
-const replaceAuction = (tempId: string, real: AuctionOverview) => {
-  setAuctions((prev) =>
-    prev.map((a) => (a.auction.id === tempId ? real : a))
-  );
-  setSelectedAuction(real);
-};
+  const replaceAuction = (tempId: string, real: AuctionOverview) => {
+    setAuctions((prev) => prev.map((a) => (a.auction.id === tempId ? real : a)));
+    setSelectedAuction(real);
+  };
 
-const removeAuction = (tempId: string) => {
-  setAuctions((prev) =>
-    prev.filter((a) => a.auction.id !== tempId)
-  );
-};
+  const removeAuction = (tempId: string) => {
+    setAuctions((prev) => prev.filter((a) => a.auction.id !== tempId));
+  };
   // NEW: table controls
   const [tab, setTab] = useState<AuctionTab>("all");
   const [search, setSearch] = useState("");
@@ -44,9 +47,7 @@ const removeAuction = (tempId: string) => {
       // search filter (safe even if listing is missing)
       const title = a.listing?.basicInformation?.title ?? "";
       const location =
-        a.listing?.basicInformation?.location?.city ??
-        a.listing?.basicInformation?.location?.state ??
-        "";
+        a.listing?.basicInformation?.location?.city ?? a.listing?.basicInformation?.location?.state ?? "";
 
       const searchOk =
         !q ||
@@ -74,10 +75,10 @@ const removeAuction = (tempId: string) => {
   };
 
   const closeDrawer = () => setSelectedAuction(null);
-const handleCreated = (row: AuctionOverview) => {
-  setAuctions((prev) => [row, ...prev]);
-  setSelectedAuction(row); // optional: open it immediately
-};
+  const handleCreated = (row: AuctionOverview) => {
+    setAuctions((prev) => [row, ...prev]);
+    setSelectedAuction(row); // optional: open it immediately
+  };
   return {
     // data
     auctions,
@@ -90,7 +91,10 @@ const handleCreated = (row: AuctionOverview) => {
     search,
     setSearch,
 
-    addOptimistic,replaceAuction,removeAuction,
+    addOptimistic,
+    replaceAuction,
+    removeAuction,
+    replaceAuctions,
     // actions
     handleRowClick,
     handleUpdate,

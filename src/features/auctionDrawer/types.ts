@@ -33,8 +33,8 @@ export interface AuctionDrawerUIProps {
   setState: (v: string) => void;
   zipcode: string;
   setZipcode: (v: string) => void;
-  primaryImage: string;
-  setPrimaryImage: (v: string) => void;
+  thumbnailUrl: string;
+  setThumbnailUrl: (v: string) => void;
   handleSaveListing: () => void;
 
   // details edits
@@ -60,6 +60,7 @@ export interface AuctionDrawerUIProps {
   handleSaveDetails: () => void;
   handlePublish: () => void;
   handleEnd: () => void;
+  handleResume: () => void;
   handleDeleteClick: () => void;
 
   // bids panel

@@ -1,15 +1,13 @@
 // src/routes/dashboard/controllers/useDashboardController.ts
 import { useCallback, useMemo, useState } from "react";
 import type { IAuction } from "../../interfaces/IAuction";
-import { AuctionOverview } from "../../features/auctions/types";
+import type { AuctionOverview } from "../../features/auctions/types";
+import type { AuctionRealtimeEvent } from "../../features/auctions/services/auctionRealtime";
 
 export type AuctionTab = "all" | IAuction["status"];
 
 export function useDashboardController(initialAuctions: AuctionOverview[]) {
-  // source of truth for table
   const [auctions, setAuctions] = useState<AuctionOverview[]>(initialAuctions);
-
-  // drawer selection
   const [selectedAuction, setSelectedAuction] = useState<AuctionOverview | null>(null);
 
   const replaceAuctions = useCallback((nextAuctions: AuctionOverview[]) => {
@@ -20,20 +18,31 @@ export function useDashboardController(initialAuctions: AuctionOverview[]) {
     });
   }, []);
 
-  const addOptimistic = (row: AuctionOverview) => {
+  const upsertAuction = useCallback((row: AuctionOverview) => {
+    setAuctions((prev) => {
+      const exists = prev.some((a) => a.auction.id === row.auction.id);
+      return exists
+        ? prev.map((a) => (a.auction.id === row.auction.id ? row : a))
+        : [row, ...prev];
+    });
+    setSelectedAuction((prev) => (prev?.auction.id === row.auction.id ? row : prev));
+  }, []);
+
+  const addOptimistic = useCallback((row: AuctionOverview) => {
     setAuctions((prev) => [row, ...prev]);
     setSelectedAuction(row);
-  };
+  }, []);
 
-  const replaceAuction = (tempId: string, real: AuctionOverview) => {
+  const replaceAuction = useCallback((tempId: string, real: AuctionOverview) => {
     setAuctions((prev) => prev.map((a) => (a.auction.id === tempId ? real : a)));
     setSelectedAuction(real);
-  };
+  }, []);
 
-  const removeAuction = (tempId: string) => {
+  const removeAuction = useCallback((tempId: string) => {
     setAuctions((prev) => prev.filter((a) => a.auction.id !== tempId));
-  };
-  // NEW: table controls
+    setSelectedAuction((prev) => (prev?.auction.id === tempId ? null : prev));
+  }, []);
+
   const [tab, setTab] = useState<AuctionTab>("all");
   const [search, setSearch] = useState("");
 
@@ -41,13 +50,12 @@ export function useDashboardController(initialAuctions: AuctionOverview[]) {
     const q = search.trim().toLowerCase();
 
     return auctions.filter((a) => {
-      // tab filter
       const tabOk = tab === "all" ? true : a.auction.status === tab;
-
-      // search filter (safe even if listing is missing)
       const title = a.listing?.basicInformation?.title ?? "";
       const location =
-        a.listing?.basicInformation?.location?.city ?? a.listing?.basicInformation?.location?.state ?? "";
+        a.listing?.basicInformation?.location?.city ??
+        a.listing?.basicInformation?.location?.state ??
+        "";
 
       const searchOk =
         !q ||
@@ -60,46 +68,93 @@ export function useDashboardController(initialAuctions: AuctionOverview[]) {
     });
   }, [auctions, tab, search]);
 
-  const handleRowClick = (auction: AuctionOverview) => {
+  const handleRowClick = useCallback((auction: AuctionOverview) => {
     setSelectedAuction(auction);
-  };
+  }, []);
 
-  const handleUpdate = (updated: AuctionOverview) => {
-    setAuctions((prev) => prev.map((a) => (a.auction.id === updated.auction.id ? updated : a)));
-    setSelectedAuction((prev) => (prev?.auction.id === updated.auction.id ? updated : prev));
-  };
+  const handleUpdate = useCallback(
+    (updated: AuctionOverview) => {
+      upsertAuction(updated);
+    },
+    [upsertAuction],
+  );
 
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     setAuctions((prev) => prev.filter((a) => a.auction.id !== id));
     setSelectedAuction((prev) => (prev?.auction.id === id ? null : prev));
-  };
+  }, []);
 
-  const closeDrawer = () => setSelectedAuction(null);
-  const handleCreated = (row: AuctionOverview) => {
-    setAuctions((prev) => [row, ...prev]);
-    setSelectedAuction(row); // optional: open it immediately
-  };
+  const closeDrawer = useCallback(() => setSelectedAuction(null), []);
+
+  const handleCreated = useCallback(
+    (row: AuctionOverview) => {
+      upsertAuction(row);
+      setSelectedAuction(row);
+    },
+    [upsertAuction],
+  );
+
+  const updateBidSnapshot = useCallback(
+    (auctionId: string, bid: AuctionOverview["bid"]) => {
+      setAuctions((prev) =>
+        prev.map((row) =>
+          row.auction.id === auctionId
+            ? {
+                ...row,
+                bid,
+              }
+            : row,
+        ),
+      );
+      setSelectedAuction((prev) =>
+        prev?.auction.id === auctionId
+          ? {
+              ...prev,
+              bid,
+            }
+          : prev,
+      );
+    },
+    [],
+  );
+
+  const handleRealtimeEvent = useCallback(
+    (event: AuctionRealtimeEvent) => {
+      if (event.type === "auction.deleted") {
+        if (event.auctionId) handleDelete(event.auctionId);
+        return;
+      }
+
+      if (event.payload?.view) {
+        upsertAuction(event.payload.view);
+      }
+
+      if (event.auctionId && event.payload?.bidSnapshot) {
+        updateBidSnapshot(event.auctionId, event.payload.bidSnapshot);
+      }
+    },
+    [handleDelete, updateBidSnapshot, upsertAuction],
+  );
+
   return {
-    // data
     auctions,
     filteredAuctions,
     selectedAuction,
-
-    // table controls
     tab,
     setTab,
     search,
     setSearch,
-
     addOptimistic,
     replaceAuction,
     removeAuction,
     replaceAuctions,
-    // actions
+    upsertAuction,
+    updateBidSnapshot,
     handleRowClick,
     handleUpdate,
     handleDelete,
     closeDrawer,
     handleCreated,
+    handleRealtimeEvent,
   };
 }

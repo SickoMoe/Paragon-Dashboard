@@ -17,6 +17,10 @@ export const LoginForm = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
+
+      if (!response.ok) {
+        throw new Error("Login failed");
+      }
     } catch (err: any) {
       setError(err?.message ?? "Login failed");
     } finally {

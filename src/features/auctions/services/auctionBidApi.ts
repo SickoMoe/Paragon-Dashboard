@@ -1,4 +1,3 @@
-// src/routes/dashboard/services/auctionBidsApi.ts
 import { request } from "../../../core/api/request";
 import { BASE_URL } from "../../../core/const";
 
@@ -8,7 +7,12 @@ export type BidDTO = {
   bidderProfileId: string;
   amount: number;
   createdAt: string;
-  source?: string;
+  source?: "user" | "auto" | "admin" | "system";
+  status?: "accepted" | "voided";
+  adminNote?: string;
+  voidedAt?: string;
+  voidedBy?: string;
+  voidReason?: string;
 };
 
 export type AuctionLeaderboardDTO = {
@@ -16,9 +20,47 @@ export type AuctionLeaderboardDTO = {
   openingBid: number;
   incrementAmount: number;
   currentBid: number;
+  hasReserve?: boolean;
+  reserveMet?: boolean;
   bids: BidDTO[];
+  voidedBids?: BidDTO[];
 };
 
-export function fetchAuctionBids(auctionId: string): Promise<AuctionLeaderboardDTO> {
-  return request(`${BASE_URL}/auctions/${auctionId}/leaderboard`);
+export function fetchAuctionBids(
+  auctionId: string,
+): Promise<AuctionLeaderboardDTO> {
+  return request(
+    `${BASE_URL}/auctions/${encodeURIComponent(auctionId)}/bids/manage`,
+  );
+}
+
+export function recordAdminBid(
+  auctionId: string,
+  input: {
+    bidderProfileId: string;
+    amount: number;
+    adminNote?: string;
+  },
+): Promise<AuctionLeaderboardDTO> {
+  return request(
+    `${BASE_URL}/auctions/${encodeURIComponent(auctionId)}/bids/manage`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function voidAuctionBid(
+  auctionId: string,
+  bidId: string,
+  reason: string,
+): Promise<AuctionLeaderboardDTO> {
+  return request(
+    `${BASE_URL}/auctions/${encodeURIComponent(auctionId)}/bids/${encodeURIComponent(bidId)}/void`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ reason }),
+    },
+  );
 }

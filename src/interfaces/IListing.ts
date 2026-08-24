@@ -13,6 +13,8 @@ export interface IListing {
       city: string;
       state: string;
       zipcode: string;
+      latitude?: number;
+      longitude?: number;
     };
   };
   description: {
@@ -20,6 +22,7 @@ export interface IListing {
     detailedDescription: string;
   };
   media: {
+    thumbnailUrl?: string;
     images: string[]; // URLs of images
     videos?: string[]; // URLs of videos
   };

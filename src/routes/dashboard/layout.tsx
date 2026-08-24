@@ -2,49 +2,35 @@
 import { Outlet } from "react-router-dom";
 import { useDashboardFrame } from "../../core/frameContext";
 import Navbar from "../../core/layout/navbar/Navbar";
+import "../../style/DashboardShell.css";
 
 export default function DashboardLayout() {
   const { frame } = useDashboardFrame();
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fff" }}>
-      {/* Full-width frame header */}
+    <div className="dashShell">
       <Navbar />
 
-      {/* Page content area */}
-      <div style={{ padding: 24 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 16,
-          }}
-        >
+      <div className="dashShell__body">
+        <div className="dashShell__header">
           <div>
-            <h1 style={{ margin: 0 }}>{frame.title}</h1>
+            <h1 className="dashShell__title">{frame.title}</h1>
             {frame.subtitle ? (
-              <p
-                style={{
-                  margin: "6px 0 0",
-                  color: "#6b7280",
-                  fontSize: 13,
-                }}
-              >
+              <p className="dashShell__subtitle">
                 {frame.subtitle}
               </p>
             ) : null}
           </div>
 
-          {frame.action ?? null}
+          {frame.action ? <div className="dashShell__action">{frame.action}</div> : null}
         </div>
 
-        {frame.tabs ? <div style={{ marginTop: 14 }}>{frame.tabs}</div> : null}
+        {frame.tabs ? <div className="dashShell__tabs">{frame.tabs}</div> : null}
         {frame.toolbar ? (
-          <div style={{ marginTop: 12 }}>{frame.toolbar}</div>
+          <div className="dashShell__toolbar">{frame.toolbar}</div>
         ) : null}
 
-        <div style={{ marginTop: 12 }}>
+        <div className="dashShell__content">
           <Outlet />
         </div>
       </div>

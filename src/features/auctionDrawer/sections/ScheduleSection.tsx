@@ -25,13 +25,13 @@ export function ScheduleSection({
   handleScheduleSave,
 }: Props) {
   return (
-    <section style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12, marginTop: 12 }}>
+    <section style={{ borderTop: "1px solid var(--dash-border)", paddingTop: 14, marginTop: 14 }}>
       <h4 style={{ margin: "0 0 8px" }}>Schedule</h4>
 
       {editingSchedule ? (
         <>
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 13, display: "block" }}>Start Date/Time</label>
+            <label style={{ fontSize: 12, color: "var(--dash-muted)", display: "block", marginBottom: 4 }}>Start Date/Time</label>
             <input
               type="datetime-local"
               value={startDate}
@@ -41,7 +41,7 @@ export function ScheduleSection({
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 13, display: "block" }}>End Date/Time</label>
+            <label style={{ fontSize: 12, color: "var(--dash-muted)", display: "block", marginBottom: 4 }}>End Date/Time</label>
             <input
               type="datetime-local"
               value={endDate}
@@ -61,7 +61,7 @@ export function ScheduleSection({
         </>
       ) : (
         <button onClick={() => setEditingSchedule(true)} style={secondaryBtn}>
-          ✏️ Edit Schedule
+          Edit Schedule
         </button>
       )}
     </section>

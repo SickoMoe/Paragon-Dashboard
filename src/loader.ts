@@ -3,18 +3,48 @@ import { request } from "./core/api/request";
 
 export type RootLoaderData = {
   bidderApplications: any[];
+  listingReviewConversations: any[];
+  auctionQuestionConversations: any[];
 };
 
-export async function rootLoader(): Promise<RootLoaderData> {
+async function safeLoad<T>(label: string, task: Promise<T>, fallback: T): Promise<T> {
   try {
-    const bidderApplications = await request<{ rows: any[] }>("/api/bidder/applications?status=all").then((r) =>
-      Array.isArray(r?.rows) ? r.rows : [],
-    );
-
-    return { bidderApplications };
+    return await task;
   } catch (err) {
-    console.error("Failed to load bidder applications:", err);
-
-    return { bidderApplications: [] };
+    console.error("Failed to load " + label + ":", err);
+    return fallback;
   }
+}
+
+export async function rootLoader(): Promise<RootLoaderData> {
+  const [bidderApplications, listingReviewConversations, auctionQuestionConversations] =
+    await Promise.all([
+      safeLoad(
+        "bidder applications",
+        request<{ rows: any[] }>("/api/bidder/applications?status=all").then((r) =>
+          Array.isArray(r?.rows) ? r.rows : [],
+        ),
+        [],
+      ),
+      safeLoad(
+        "listing conversations",
+        request<{ conversations: any[] }>("/api/admin/messages/listings?status=all").then((r) =>
+          Array.isArray(r?.conversations) ? r.conversations : [],
+        ),
+        [],
+      ),
+      safeLoad(
+        "auction questions",
+        request<{ conversations: any[] }>("/api/admin/messages/questions?status=all").then((r) =>
+          Array.isArray(r?.conversations) ? r.conversations : [],
+        ),
+        [],
+      ),
+    ]);
+
+  return {
+    bidderApplications,
+    listingReviewConversations,
+    auctionQuestionConversations,
+  };
 }

@@ -1,4 +1,5 @@
 import React from "react";
+import "../../../style/table.css";
 
 export type MessageRow = {
   threadId: string;
@@ -18,51 +19,39 @@ export function MessagesTable({
 }) {
   if (!rows.length) {
     return (
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid #e5e7eb",
-          borderRadius: 12,
-          padding: 18,
-          color: "#6b7280",
-          fontSize: 13,
-        }}
-      >
+      <div className="adminTable__empty">
         No messages found.
       </div>
     );
   }
 
   return (
-    <div style={styles.table}>
-      <div style={styles.headerRow}>
+    <div className="adminTable adminTable--messages">
+      <div className="adminTable__row adminTable__row--header">
         <div>From</div>
         <div>Subject</div>
         <div>Preview</div>
-        <div style={{ textAlign: "right" }}>Updated</div>
+        <div className="adminTable__right">Updated</div>
       </div>
 
       {rows.map((r) => (
         <div
           key={r.threadId}
-          style={{
-            ...styles.row,
-            background: r.unread ? "#f9fafb" : "#fff",
-          }}
+          className={`adminTable__row adminTable__row--body ${r.unread ? "adminTable__row--unread" : ""}`}
           onClick={() => onRowClick(r)}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="adminTable__statusCell">
             {r.unread ? <UnreadDot /> : null}
-            <span style={{ fontSize: 13, color: "#111827" }}>{r.fromName}</span>
+            <span className="adminTable__primaryText">{r.fromName}</span>
           </div>
 
-          <div style={{ fontSize: 13, color: "#111827" }}>{r.subject}</div>
+          <div className="adminTable__primaryText">{r.subject}</div>
 
-          <div style={styles.muted} title={r.preview}>
+          <div className="adminTable__muted adminTable__truncate" title={r.preview}>
             {r.preview}
           </div>
 
-          <div style={{ textAlign: "right", ...styles.muted }}>
+          <div className="adminTable__muted adminTable__right">
             {formatDate(r.updatedAt)}
           </div>
         </div>
@@ -73,15 +62,7 @@ export function MessagesTable({
 
 function UnreadDot() {
   return (
-    <span
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: 999,
-        background: "#2563eb",
-        display: "inline-block",
-      }}
-    />
+    <span className="adminTable__statusDot adminTable__statusDot--unread" />
   );
 }
 
@@ -90,38 +71,3 @@ function formatDate(iso: string) {
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString();
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  table: {
-    background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  headerRow: {
-    display: "grid",
-    gridTemplateColumns: "220px 1.2fr 2fr 220px",
-    gap: 12,
-    padding: "10px 14px",
-    fontSize: 12,
-    color: "#6b7280",
-    borderBottom: "1px solid #e5e7eb",
-    background: "#fafafa",
-  },
-  row: {
-    display: "grid",
-    gridTemplateColumns: "220px 1.2fr 2fr 220px",
-    gap: 12,
-    padding: "12px 14px",
-    borderBottom: "1px solid #f3f4f6",
-    cursor: "pointer",
-    alignItems: "center",
-  },
-  muted: {
-    fontSize: 12,
-    color: "#6b7280",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-};

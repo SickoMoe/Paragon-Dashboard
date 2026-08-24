@@ -36,7 +36,7 @@ export function ActionsSection({
   const canPublish = row.auction.status === "scheduled";
 
   return (
-    <section style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12, marginTop: 12 }}>
+    <section style={{ borderTop: "1px solid var(--dash-border)", paddingTop: 14, marginTop: 14 }}>
       <h4 style={{ margin: "0 0 8px" }}>Actions</h4>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -57,7 +57,7 @@ export function ActionsSection({
         </button>
 
         <button onClick={handleDeleteClick} disabled={loading} style={dangerBtn}>
-          {loading ? "Deleting..." : "🗑 Delete Auction"}
+          {loading ? "Deleting..." : "Delete Auction"}
         </button>
 
 {bidsOpen && leaderboard && (

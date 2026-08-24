@@ -1,6 +1,7 @@
 // src/routes/dashboard/components/auctionDrawer/sections/SummaryHeader.tsx
 import React from "react";
 import { AuctionOverview } from "../../auctions/types";
+import { getListingThumbnail } from "../../auctions/utils/listingMedia";
 
 type Props = {
   row: AuctionOverview;
@@ -20,7 +21,7 @@ export function SummarySection({
   loading,
   onViewBids,
 }: Props) {
-  const img = row.listing?.media?.images?.[0] ?? "";
+  const img = getListingThumbnail(row.listing);
   const bi = row.listing?.basicInformation;
   const loc = bi?.location;
 
@@ -78,8 +79,8 @@ export function SummarySection({
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  wrap: { borderRadius: 16, overflow: "hidden", border: "1px solid #eef0f4", background: "#fff" },
-  imageWrap: { position: "relative", height: 170, background: "#f3f4f6" },
+  wrap: { borderRadius: 16, overflow: "hidden", border: "1px solid var(--dash-border)", background: "var(--dash-card)" },
+  imageWrap: { position: "relative", height: 170, background: "var(--dash-surface)" },
   image: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
   fallback: { width: "100%", height: "100%" },
 
@@ -92,7 +93,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 999,
     border: "1px solid rgba(255,255,255,0.55)",
     background: "rgba(17,24,39,0.55)",
-    color: "#fff",
+    color: "var(--dash-card)",
     cursor: "pointer",
     fontSize: 20,
     lineHeight: "34px",
@@ -100,24 +101,24 @@ const styles: Record<string, React.CSSProperties> = {
 
   body: { padding: 14 },
   topRow: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" },
-  title: { fontSize: 16, fontWeight: 800, color: "#111827" },
-  muted: { fontSize: 12, color: "#6b7280", marginTop: 4 },
+  title: { fontFamily: "var(--dash-font-display)", fontSize: 22, fontWeight: 600, color: "var(--dash-ink)", letterSpacing: 0 },
+  muted: { fontSize: 12, color: "var(--dash-muted)", marginTop: 4 },
   badge: {
     display: "inline-flex",
     padding: "6px 10px",
     borderRadius: 999,
     fontSize: 12,
-    border: "1px solid #eef0f4",
-    background: "#f9fafb",
-    color: "#111827",
+    border: "1px solid var(--dash-border)",
+    background: "var(--dash-surface)",
+    color: "var(--dash-ink)",
     fontWeight: 700,
     textTransform: "capitalize",
   },
 
   metaRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 },
-  metaItem: { border: "1px solid #eef0f4", borderRadius: 12, padding: 10, background: "#fff" },
-  metaLabel: { fontSize: 11, color: "#6b7280" },
-  metaValue: { fontSize: 12, color: "#111827", marginTop: 4 },
+  metaItem: { border: "1px solid var(--dash-border)", borderRadius: 12, padding: 10, background: "var(--dash-card)" },
+  metaLabel: { fontSize: 11, color: "var(--dash-muted)" },
+  metaValue: { fontSize: 12, color: "var(--dash-ink)", marginTop: 4 },
 
   actionsRow: { display: "flex", gap: 8, marginTop: 12 },
 };
@@ -126,9 +127,9 @@ const btn: Record<string, React.CSSProperties> = {
   secondary: {
     padding: "10px 12px",
     borderRadius: 10,
-    border: "1px solid #eef0f4",
-    background: "#fff",
-    color: "#111827",
+    border: "1px solid var(--dash-border)",
+    background: "var(--dash-card)",
+    color: "var(--dash-ink)",
     cursor: "pointer",
     fontSize: 13,
     width: "100%",
@@ -137,8 +138,8 @@ const btn: Record<string, React.CSSProperties> = {
     padding: "10px 12px",
     borderRadius: 10,
     border: "1px solid transparent",
-    background: "#f9fafb",
-    color: "#6b7280",
+    background: "var(--dash-surface)",
+    color: "var(--dash-muted)",
     cursor: "not-allowed",
     fontSize: 13,
     width: "100%",

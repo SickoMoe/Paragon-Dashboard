@@ -36,18 +36,18 @@ export function DetailsSection({
   handleSaveDetails,
 }: Props) {
   return (
-    <section style={{ borderTop: "1px solid #e5e7eb", paddingTop: 12, marginTop: 12 }}>
+    <section style={{ borderTop: "1px solid var(--dash-border)", paddingTop: 14, marginTop: 14 }}>
       <h4 style={{ margin: "0 0 8px" }}>Details</h4>
 
       {editingDetails ? (
         <>
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 13, display: "block" }}>Listing ID</label>
+            <label style={{ fontSize: 12, color: "var(--dash-muted)", display: "block", marginBottom: 4 }}>Listing ID</label>
             <input value={listingId} onChange={(e) => setListingId(e.target.value)} style={inputStyle} />
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 13, display: "block" }}>Starting Bid</label>
+            <label style={{ fontSize: 12, color: "var(--dash-muted)", display: "block", marginBottom: 4 }}>Starting Bid</label>
             <input
               inputMode="numeric"
               value={startingBid}
@@ -58,7 +58,7 @@ export function DetailsSection({
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 13, display: "block" }}>Increment</label>
+            <label style={{ fontSize: 12, color: "var(--dash-muted)", display: "block", marginBottom: 4 }}>Increment</label>
             <input
               inputMode="numeric"
               value={increment}
@@ -69,7 +69,7 @@ export function DetailsSection({
           </div>
 
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 13, display: "block" }}>Status</label>
+            <label style={{ fontSize: 12, color: "var(--dash-muted)", display: "block", marginBottom: 4 }}>Status</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as IAuction["status"])}
@@ -94,7 +94,7 @@ export function DetailsSection({
         </>
       ) : (
         <button onClick={() => setEditingDetails(true)} style={secondaryBtn}>
-          ✏️ Edit Details
+          Edit Details
         </button>
       )}
     </section>

@@ -1,9 +1,5 @@
 import { ReactNode } from 'react';
-import {
-  LoaderFunction,
-  ActionFunction,
-  IndexRouteObject,
-} from 'react-router-dom';
+import { LoaderFunction, ActionFunction } from 'react-router-dom';
 
 export default interface GenericRouteConfig {
   index?: boolean; // ✅ Include this!

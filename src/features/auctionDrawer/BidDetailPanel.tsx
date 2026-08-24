@@ -4,7 +4,7 @@ import { BidDTO } from "../auctions/services/auctionBidApi";
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: "#6b7280" }}>{label}</div>
+      <div style={{ fontSize: 12, color: "var(--dash-muted)" }}>{label}</div>
       <div style={{ fontWeight: 600 }}>{value}</div>
     </div>
   );

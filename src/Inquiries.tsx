@@ -2,9 +2,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Dispatch } from 'redux';
 
 import { useNavigate } from 'react-router-dom';
-import { removeInquiry, RemoveInquiryAction } from './redux/inquiry_action.ts';
-import { IInquiry } from './interfaces/IInquiry.ts';
-import { RootState } from './redux/reducer.ts';
+import { removeInquiry, RemoveInquiryAction } from './redux/inquiry_action';
+import { IInquiry } from './interfaces/IInquiry';
+import { RootState } from './redux/reducer';
 
 export function Inquiries() {
   const dispatch = useDispatch<Dispatch<RemoveInquiryAction>>();

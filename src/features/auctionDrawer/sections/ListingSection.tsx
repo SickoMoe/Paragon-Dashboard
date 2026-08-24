@@ -1,303 +1,528 @@
 // src/routes/dashboard/components/auctionDrawer/sections/ListingSection.tsx
-import React, { useEffect, useMemo, useState } from "react";
-import { inputStyle } from "../styles";
+import React, { useMemo, useState } from "react";
 import { AuctionOverview } from "../../auctions/types";
-import type { ListingModerationStatus } from "../../listingApi";
+import type { ListingDraftPayload } from "../../auctions/types";
+import { resolveListingMediaUrl } from "../../auctions/utils/listingMedia";
+import type { IListing } from "../../../interfaces/IListing";
 
 type Props = {
   row: AuctionOverview;
   listingLoading: boolean;
-  loading: boolean;
-  saveSucceeded: boolean;
-  moderationStatus: ListingModerationStatus;
-  setModerationStatus: React.Dispatch<React.SetStateAction<ListingModerationStatus>>;
-  onSave: () => void;
-  onCancel: () => void;
-  title: string;
-  setTitle: (v: string) => void;
-  type: string;
-  setType: (v: string) => void;
-  primaryImage: string;
-  setPrimaryImage: (v: string) => void;
-  address: string;
-  setAddress: (v: string) => void;
-  city: string;
-  setCity: (v: string) => void;
-  state: string;
-  setState: (v: string) => void;
-  zipcode: string;
-  setZipcode: (v: string) => void;
+  onOpenConversation?: () => void;
 };
 
-export function ListingSection(props: Props) {
-  const {
-    row,
-    listingLoading,
-    loading,
-    saveSucceeded,
-    moderationStatus,
-    setModerationStatus,
-    onSave,
-    onCancel,
-    title,
-    setTitle,
-    type,
-    setType,
-    primaryImage,
-    setPrimaryImage,
-    address,
-    setAddress,
-    city,
-    setCity,
-    state,
-    setState,
-    zipcode,
-    setZipcode,
-  } = props;
+type DiffRow = {
+  label: string;
+  current: string;
+  submitted: string;
+  changed: boolean;
+};
 
-  const [displayStatus, setDisplayStatus] = useState<ListingModerationStatus | "—">("—");
+type ReviewRequest = NonNullable<NonNullable<AuctionOverview["listingReview"]>["request"]>;
+
+export function ListingSection({ row, listingLoading, onOpenConversation }: Props) {
+  const [showAllSubmitted, setShowAllSubmitted] = useState(false);
+  const [showAllAdmin, setShowAllAdmin] = useState(false);
 
   const listing = row.listing;
+  const review = row.listingReview;
+  const request = review?.request;
+  const submittedSnapshot = request?.submittedSnapshot ?? request?.data;
+  const adminEditedSnapshot = request?.adminEditedSnapshot;
+  const approvedSnapshot = request?.approvedSnapshot ?? review?.approvedSnapshot;
+  const workingDraft = review?.workingDraft;
+  const title = approvedSnapshot?.basicInformation?.title ?? listing?.basicInformation?.title ?? "Untitled listing";
+  const locationLine = formatLocation(
+    approvedSnapshot?.basicInformation?.location ?? listing?.basicInformation?.location,
+  );
+  const thumbnail = resolveListingMediaUrl(
+    getMediaThumbnail(approvedSnapshot?.media ?? submittedSnapshot?.media ?? listing?.media),
+  );
+  const imageCount = approvedSnapshot?.media?.images?.length ?? submittedSnapshot?.media?.images?.length ?? listing?.media?.images?.length ?? 0;
+  const reviewStatus = request?.status ?? review?.status ?? listing?.moderationStatus ?? "-";
+  const submittedDiffRows = useMemo(() => buildDraftRows(listing, submittedSnapshot), [listing, submittedSnapshot]);
+  const adminDiffRows = useMemo(
+    () => buildPayloadRows(submittedSnapshot, adminEditedSnapshot),
+    [submittedSnapshot, adminEditedSnapshot],
+  );
+  const history = useMemo(() => buildReviewHistory(request, review?.history), [request, review?.history]);
+  const auditTrail = row.auction.lifecycle?.auditTrail ?? [];
 
-  useEffect(() => {
-    setDisplayStatus(moderationStatus);
-  }, [moderationStatus]);
+  if (listingLoading) {
+    return <p style={styles.muted}>Loading listing...</p>;
+  }
 
-  const locationLine = useMemo(() => {
-    const loc = listing?.basicInformation?.location;
-    if (!loc) return "—";
-    const parts = [loc.address, loc.city, loc.state, loc.zipcode].filter(Boolean);
-    return parts.length ? parts.join(", ") : "—";
-  }, [listing]);
-
-  const imageCount = listing?.media?.images?.length ?? 0;
-
-  function handleListingModeration(status: ListingModerationStatus) {
-    if (!listing) return;
-
-    setModerationStatus(status);
-    setDisplayStatus(status);
+  if (!listing) {
+    return <p style={styles.muted}>No listing loaded.</p>;
   }
 
   return (
-    <section style={styles.section}>
-      {listingLoading ? (
-        <p style={styles.muted}>Loading listing…</p>
-      ) : !listing ? (
-        <p style={styles.muted}>No listing loaded.</p>
-      ) : (
-        <>
-          <div style={styles.editorCard}>
-            <div style={styles.editorTitle}>Listing details</div>
+    <section style={styles.wrap}>
+      <section style={styles.section}>
+        <div style={styles.sectionHeader}>
+          <div>
+            <div style={styles.sectionTitle}>Approved Listing</div>
+            <div style={styles.muted}>Read-only listing context for this auction.</div>
+          </div>
+          {onOpenConversation ? (
+            <button type="button" style={secondaryBtnSmall} onClick={onOpenConversation}>
+              Conversation
+            </button>
+          ) : null}
+        </div>
 
-            <div style={styles.field}>
-              <label style={styles.label}>Title</label>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} />
-            </div>
+        <div style={styles.listingSummary}>
+          <div style={styles.thumbWrap}>
+            {thumbnail ? <img src={thumbnail} alt="" style={styles.thumbImg} /> : <div style={styles.thumbFallback} />}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={styles.listingTitle}>{title}</div>
+            <div style={styles.muted}>{locationLine}</div>
+            <div style={styles.muted}>{imageCount} images</div>
+          </div>
+        </div>
 
-            <div style={styles.field}>
-              <label style={styles.label}>Type</label>
-              <input value={type} onChange={(e) => setType(e.target.value)} style={inputStyle} />
-            </div>
+        <div style={styles.metaGrid}>
+          <MetaPill label="Listing ID" value={shortId(listing.listingId)} />
+          <MetaPill label="Review status" value={formatStatus(reviewStatus)} />
+          <MetaPill label="Submitted" value={formatDate(request?.submittedAt ?? request?.createdAt)} />
+          <MetaPill label="Updated" value={formatDate(request?.updatedAt)} />
+          <MetaPill label="Review request" value={shortId(request?.reviewRequestId ?? request?.draftId)} />
+          <MetaPill label="Submission" value={request?.submissionNumber ? `#${request.submissionNumber}` : "-"} />
+          <MetaPill label="Revision" value={request?.revision ? String(request.revision) : "-"} />
+          <MetaPill label="Owner" value={shortId(review?.ownerAccountId ?? listing.ownerAccountId)} />
+        </div>
+      </section>
 
-            <div style={styles.field}>
-              <label style={styles.label}>Primary Image URL</label>
-              <div style={styles.inlineFieldRow}>
-                <input
-                  value={primaryImage}
-                  onChange={(e) => setPrimaryImage(e.target.value)}
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                {listing.media?.images?.[0] ? (
-                  <a href={listing.media.images[0]} target="_blank" rel="noreferrer" style={linkBtn}>
-                    Open image
-                  </a>
+      <DiffSection
+        title="Submitted Changes"
+        currentLabel="Current listing"
+        submittedLabel="Submitted version"
+        rows={submittedDiffRows}
+        showAll={showAllSubmitted}
+        onToggleShowAll={() => setShowAllSubmitted((value) => !value)}
+      />
+
+      {adminEditedSnapshot ? (
+        <DiffSection
+          title="Admin-edited Review Version"
+          currentLabel="Original submission"
+          submittedLabel="Admin review version"
+          rows={adminDiffRows}
+          showAll={showAllAdmin}
+          onToggleShowAll={() => setShowAllAdmin((value) => !value)}
+        />
+      ) : null}
+
+      <section style={styles.section}>
+        <div style={styles.sectionTitle}>Listing Version</div>
+        <div style={styles.versionGrid}>
+          <MetaPill label="Approved snapshot" value={approvedSnapshot ? "Available" : "Not attached"} />
+          <MetaPill label="Working draft" value={workingDraft ? `Revision ${workingDraft.revision ?? "-"}` : "None"} />
+          <MetaPill label="Working updated" value={formatDate(workingDraft?.updatedAt)} />
+          <MetaPill label="Auction listing" value={shortId(row.auction.listingId)} />
+        </div>
+      </section>
+
+      <section style={styles.section}>
+        <div style={styles.sectionTitle}>Review History</div>
+        {history.length ? (
+          <div style={styles.timeline}>
+            {history.map((item) => (
+              <div key={itemKey(item)} style={styles.timelineItem}>
+                <div style={styles.timelineTop}>
+                  <strong>{historyTitle(item)}</strong>
+                  <span style={styles.muted}>{formatDate(item.updatedAt ?? item.submittedAt ?? item.createdAt)}</span>
+                </div>
+                <div style={styles.muted}>
+                  {formatStatus(item.status ?? "-")}
+                  {item.generalMessage || item.reviewReason ? `: ${item.generalMessage ?? item.reviewReason}` : ""}
+                </div>
+                {item.fieldIssues?.length ? (
+                  <div style={styles.issueList}>
+                    {item.fieldIssues.map((issue) => (
+                      <span key={issue.issueId} style={issue.severity === "blocking" ? styles.blockingIssue : styles.advisoryIssue}>
+                        {issue.fieldPath ? `${issue.fieldPath}: ` : ""}
+                        {issue.message}
+                      </span>
+                    ))}
+                  </div>
                 ) : null}
               </div>
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>Address</label>
-              <input value={address} onChange={(e) => setAddress(e.target.value)} style={inputStyle} />
-            </div>
-
-            <div style={styles.inlineFieldRow}>
-              <div style={{ flex: 1 }}>
-                <label style={styles.label}>City</label>
-                <input value={city} onChange={(e) => setCity(e.target.value)} style={inputStyle} />
-              </div>
-              <div style={{ width: 90 }}>
-                <label style={styles.label}>State</label>
-                <input value={state} onChange={(e) => setState(e.target.value)} style={inputStyle} />
-              </div>
-              <div style={{ width: 110 }}>
-                <label style={styles.label}>Zip</label>
-                <input value={zipcode} onChange={(e) => setZipcode(e.target.value)} style={inputStyle} />
-              </div>
-            </div>
+            ))}
           </div>
+        ) : (
+          <p style={styles.muted}>No review history is attached.</p>
+        )}
+      </section>
 
-          <div style={styles.moderationCard}>
-            <div style={styles.editorTitle}>Moderation</div>
-
-            <div style={styles.metaRow}>
-              <MetaPill label="Status" value={displayStatus} />
-              <MetaPill label="Images" value={String(imageCount)} />
-              <MetaPill label="Location" value={locationLine} />
-            </div>
-
-            <div style={styles.actionRow}>
-              {displayStatus !== "approved" ? (
-                <button
-                  type="button"
-                  style={secondaryBtnSmall}
-                  disabled={loading}
-                  onClick={() => handleListingModeration("approved")}
-                >
-                  {displayStatus === "removed" || displayStatus === "denied" ? "Restore" : "Approve"}
-                </button>
-              ) : null}
-
-              {displayStatus !== "denied" ? (
-                <button
-                  type="button"
-                  style={secondaryBtnSmall}
-                  disabled={loading}
-                  onClick={() => handleListingModeration("denied")}
-                >
-                  Deny
-                </button>
-              ) : null}
-
-              {displayStatus !== "removed" ? (
-                <button
-                  type="button"
-                  style={secondaryBtnSmall}
-                  disabled={loading}
-                  onClick={() => handleListingModeration("removed")}
-                >
-                  Remove
-                </button>
-              ) : null}
-            </div>
+      <section id="auction-activity-log" style={styles.section}>
+        <div style={styles.sectionTitle}>Activity Log</div>
+        {auditTrail.length ? (
+          <div style={styles.timeline}>
+            {auditTrail.slice().reverse().map((event, index) => (
+              <div key={`${event.action}-${event.at}-${index}`} style={styles.timelineItem}>
+                <div style={styles.timelineTop}>
+                  <strong>{formatStatus(event.action)}</strong>
+                  <span style={styles.muted}>{formatDate(event.at)}</span>
+                </div>
+                <div style={styles.muted}>
+                  {[event.fromStatus, event.toStatus].filter(Boolean).map(formatStatus).join(" -> ") || event.reason || "-"}
+                </div>
+              </div>
+            ))}
           </div>
+        ) : (
+          <p style={styles.muted}>No auction activity is attached.</p>
+        )}
+      </section>
+    </section>
+  );
+}
 
-          <div style={styles.footerActions}>
-            {saveSucceeded ? <span style={styles.savedText}>✓ Saved</span> : null}
-            <button onClick={onCancel} disabled={loading}>
-              Cancel
-            </button>
-            <button onClick={onSave} disabled={loading}>
-              {loading ? "Saving…" : "Save changes"}
-            </button>
+function DiffSection({
+  title,
+  currentLabel,
+  submittedLabel,
+  rows,
+  showAll,
+  onToggleShowAll,
+}: {
+  title: string;
+  currentLabel: string;
+  submittedLabel: string;
+  rows: DiffRow[];
+  showAll: boolean;
+  onToggleShowAll: () => void;
+}) {
+  const changedRows = rows.filter((row) => row.changed);
+  const visibleRows = showAll ? rows : changedRows;
+
+  return (
+    <section style={styles.section}>
+      <div style={styles.sectionHeader}>
+        <div>
+          <div style={styles.sectionTitle}>{title}</div>
+          <div style={styles.muted}>{changedRows.length} changed</div>
+        </div>
+        {rows.length > changedRows.length ? (
+          <button type="button" style={secondaryBtnSmall} onClick={onToggleShowAll}>
+            {showAll ? "Changed Only" : "Expand All"}
+          </button>
+        ) : null}
+      </div>
+
+      {!rows.length ? (
+        <p style={styles.muted}>No submitted payload is attached.</p>
+      ) : !changedRows.length ? (
+        <div style={styles.emptyState}>No changes detected.</div>
+      ) : (
+        <div style={styles.diffTable}>
+          <div style={{ ...styles.diffRow, ...styles.diffHead }}>
+            <div>Field</div>
+            <div>{currentLabel}</div>
+            <div>{submittedLabel}</div>
           </div>
-        </>
+          {visibleRows.map((row) => (
+            <div key={row.label} style={styles.diffRow}>
+              <div style={row.changed ? styles.changedLabel : undefined}>{row.label}</div>
+              <div style={styles.diffValue}>{row.current}</div>
+              <div style={row.changed ? styles.submittedChangedValue : styles.diffValue}>{row.submitted}</div>
+            </div>
+          ))}
+        </div>
       )}
     </section>
   );
 }
 
-function MetaPill({ label, value }: { label: string; value: string }) {
+function MetaPill({ label, value }: { label: string; value?: string }) {
   return (
-    <div style={pill.wrap}>
-      <div style={pill.label}>{label}</div>
-      <div style={pill.value}>{value}</div>
+    <div style={styles.metaPill}>
+      <div style={styles.metaLabel}>{label}</div>
+      <div style={styles.metaValue}>{value || "-"}</div>
     </div>
   );
 }
 
+function buildReviewHistory(
+  request?: ReviewRequest | null,
+  history?: Array<ReviewRequest>,
+): ReviewRequest[] {
+  const items = [...(history ?? [])];
+  if (request && !items.some((item) => itemKey(item) === itemKey(request))) {
+    items.unshift(request);
+  }
+
+  return items.sort((a, b) => {
+    const aTime = Date.parse(a.updatedAt ?? a.submittedAt ?? a.createdAt ?? "");
+    const bTime = Date.parse(b.updatedAt ?? b.submittedAt ?? b.createdAt ?? "");
+    return bTime - aTime;
+  });
+}
+
+function historyTitle(item: ReviewRequest) {
+  if (item.submissionNumber) return `Submission #${item.submissionNumber}`;
+  return item.reviewRequestId ? "Review request" : "Submitted draft";
+}
+
+function itemKey(item: ReviewRequest) {
+  return item.reviewRequestId ?? item.draftId ?? `${item.submittedAt ?? item.createdAt}-${item.revision ?? ""}`;
+}
+
+function buildDraftRows(listing?: IListing | null, draft?: ListingDraftPayload): DiffRow[] {
+  if (!listing || !draft) return [];
+
+  const loc = listing.basicInformation.location;
+  const draftLoc = draft.basicInformation.location;
+
+  const rows: Array<[string, unknown, unknown]> = [
+    ["Title", listing.basicInformation.title, draft.basicInformation.title],
+    ["Type", listing.basicInformation.type, draft.basicInformation.type],
+    ["Thumbnail", getMediaThumbnail(listing.media), getMediaThumbnail(draft.media)],
+    ["Address", loc.address, draftLoc.address],
+    ["City", loc.city, draftLoc.city],
+    ["State", loc.state, draftLoc.state],
+    ["Zip", loc.zipcode, draftLoc.zipcode],
+    ["Overview", listing.description.overview, draft.description.overview],
+    ["Details", listing.description.detailedDescription, draft.description.detailedDescription],
+    ["Beds", listing.propertyFeatures.bedrooms, draft.propertyFeatures.bedrooms],
+    ["Baths", listing.propertyFeatures.bathrooms, draft.propertyFeatures.bathrooms],
+    ["Building SQFT", listing.propertyFeatures.buildingSQFT, draft.propertyFeatures.buildingSQFT],
+    ["Lot size", listing.propertyFeatures.lotSize, draft.propertyFeatures.lotSize],
+    ["Year built", listing.propertyFeatures.yearBuilt, draft.propertyFeatures.yearBuilt],
+    ["Amenities", listing.propertyFeatures.amenities, draft.propertyFeatures.amenities],
+    ["Title status", listing.legalInformation.titleStatus, draft.legalInformation.titleStatus],
+    ["Zoning", listing.legalInformation.zoningInformation, draft.legalInformation.zoningInformation],
+    ["Seller", listing.contactInformation.seller.name, draft.contactInformation.seller.name],
+    ["Seller contact", listing.contactInformation.seller.contactDetails, draft.contactInformation.seller.contactDetails],
+    ["Support contact", listing.contactInformation.biddingSupport.contactDetails, draft.contactInformation.biddingSupport.contactDetails],
+    ["Inspection", listing.additionalInformation.inspectionDetails, draft.additionalInformation.inspectionDetails],
+    ["Financing", listing.additionalInformation.financingOptions, draft.additionalInformation.financingOptions],
+    ["Social sharing", listing.socialSharing, draft.socialSharing],
+    ["Terms", listing.termsAndConditions, draft.termsAndConditions],
+  ];
+
+  return rows.map(([label, current, submitted]) => {
+    const currentValue = formatValue(current);
+    const submittedValue = formatValue(submitted);
+    return {
+      label,
+      current: currentValue,
+      submitted: submittedValue,
+      changed: normalizeValue(current) !== normalizeValue(submitted),
+    };
+  });
+}
+
+function buildPayloadRows(current?: ListingDraftPayload, submitted?: ListingDraftPayload): DiffRow[] {
+  if (!current || !submitted) return [];
+  return buildDraftRows(current as unknown as IListing, submitted);
+}
+
+function getMediaThumbnail(media?: IListing["media"] | ListingDraftPayload["media"]) {
+  return media?.thumbnailUrl || media?.images?.[0] || "";
+}
+
+function formatValue(value: unknown) {
+  if (value === undefined || value === null || value === "") return "-";
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "-";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function normalizeValue(value: unknown) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).join("|");
+  if (value === undefined || value === null) return "";
+  return String(value).trim();
+}
+
+function formatDate(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+}
+
+function formatLocation(loc?: { address?: string; city?: string; state?: string; zipcode?: string }) {
+  if (!loc) return "-";
+  const parts = [loc.address, loc.city, loc.state, loc.zipcode].filter(Boolean);
+  return parts.length ? parts.join(", ") : "-";
+}
+
+function formatStatus(value?: string) {
+  return value ? value.replace(/_/g, " ") : "-";
+}
+
+function shortId(value?: string) {
+  if (!value || value === "-") return "-";
+  return value.length > 12 ? `${value.slice(0, 8)}...` : value;
+}
+
 const styles: Record<string, React.CSSProperties> = {
-  section: {
+  wrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
     marginTop: 12,
   },
-  muted: { fontSize: 13, color: "#6b7280" },
-  editorCard: {
-    border: "1px solid #eef0f4",
-    borderRadius: 12,
-    padding: 12,
-    background: "#fff",
+  section: {
+    border: "1px solid var(--dash-border)",
+    borderRadius: 8,
+    padding: 14,
+    background: "var(--dash-card)",
   },
-  moderationCard: {
-    border: "1px solid #eef0f4",
-    borderRadius: 12,
-    padding: 12,
-    background: "#fff",
-    marginTop: 10,
+  sectionHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 12,
   },
-  editorTitle: {
+  sectionTitle: {
     fontSize: 14,
-    fontWeight: 700,
-    color: "#111827",
-    marginBottom: 10,
+    fontWeight: 800,
+    color: "var(--dash-ink)",
   },
-  field: { marginBottom: 10 },
-  label: {
-    fontSize: 12,
-    fontWeight: 500,
-    color: "#6b7280",
-    display: "block",
-    marginBottom: 6,
-  },
-  inlineFieldRow: {
+  muted: { fontSize: 12, color: "var(--dash-muted)" },
+  listingSummary: {
     display: "flex",
-    gap: 8,
+    gap: 12,
     alignItems: "center",
+    marginBottom: 12,
   },
-  actionRow: {
-    marginTop: 10,
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  metaRow: {
-    marginTop: 10,
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  footerActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 8,
-    marginTop: 16,
-    paddingTop: 12,
-    borderTop: "1px solid #eef0f4",
-  },
-  savedText: {
-    alignSelf: "center",
-    marginRight: 4,
-    fontSize: 13,
+  listingTitle: {
+    fontSize: 16,
+    color: "var(--dash-ink)",
+    fontFamily: "var(--dash-font-display)",
     fontWeight: 600,
-    color: "#047857",
+    letterSpacing: 0,
+    overflowWrap: "anywhere",
   },
-};
-
-const pill: Record<string, React.CSSProperties> = {
-  wrap: {
-    border: "1px solid #eef0f4",
-    background: "#f9fafb",
-    borderRadius: 12,
+  thumbWrap: {
+    width: 70,
+    height: 56,
+    borderRadius: 8,
+    overflow: "hidden",
+    background: "var(--dash-surface)",
+    flex: "0 0 auto",
+  },
+  thumbImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  thumbFallback: { width: "100%", height: "100%", background: "var(--dash-border)" },
+  metaGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: 8,
+  },
+  versionGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: 8,
+    marginTop: 10,
+  },
+  metaPill: {
+    border: "1px solid var(--dash-surface)",
+    background: "var(--dash-surface)",
+    borderRadius: 8,
     padding: "8px 10px",
-    minWidth: 110,
+    minWidth: 0,
   },
-  label: { fontSize: 11, color: "#6b7280" },
-  value: { fontSize: 13, fontWeight: 700, color: "#111827", marginTop: 2 },
+  metaLabel: { fontSize: 11, color: "var(--dash-muted)" },
+  metaValue: { fontSize: 12, fontWeight: 800, color: "var(--dash-ink)", marginTop: 2, textTransform: "capitalize", overflowWrap: "anywhere" },
+  diffTable: {
+    border: "1px solid var(--dash-border)",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  diffRow: {
+    display: "grid",
+    gridTemplateColumns: "140px minmax(0, 1fr) minmax(0, 1fr)",
+    gap: 10,
+    padding: "9px 12px",
+    borderBottom: "1px solid var(--dash-surface)",
+    fontSize: 12,
+    alignItems: "start",
+  },
+  diffHead: {
+    fontWeight: 800,
+    color: "var(--dash-muted)",
+    background: "var(--dash-surface)",
+  },
+  diffValue: {
+    color: "var(--dash-ink-soft)",
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  changedLabel: {
+    color: "var(--dash-ink)",
+    fontWeight: 800,
+  },
+  submittedChangedValue: {
+    color: "var(--dash-success)",
+    fontWeight: 800,
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  emptyState: {
+    border: "1px solid rgba(63, 127, 95, 0.28)",
+    background: "rgba(63, 127, 95, 0.12)",
+    borderRadius: 8,
+    padding: 10,
+    color: "var(--dash-success)",
+    fontSize: 13,
+    fontWeight: 700,
+  },
+  timeline: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    marginTop: 10,
+  },
+  timelineItem: {
+    border: "1px solid var(--dash-surface)",
+    borderRadius: 8,
+    padding: 10,
+  },
+  timelineTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 4,
+    fontSize: 13,
+  },
+  issueList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  blockingIssue: {
+    border: "1px solid rgba(212, 24, 61, 0.28)",
+    background: "rgba(212, 24, 61, 0.08)",
+    color: "var(--dash-danger)",
+    borderRadius: 999,
+    padding: "4px 8px",
+    fontSize: 11,
+    fontWeight: 700,
+  },
+  advisoryIssue: {
+    border: "1px solid rgba(199, 123, 92, 0.28)",
+    background: "rgba(199, 123, 92, 0.1)",
+    color: "var(--dash-accent)",
+    borderRadius: 999,
+    padding: "4px 8px",
+    fontSize: 11,
+    fontWeight: 700,
+  },
 };
 
 const secondaryBtnSmall: React.CSSProperties = {
   padding: "8px 10px",
-  borderRadius: 10,
-  border: "1px solid #e5e7eb",
-  background: "#f9fafb",
+  borderRadius: 8,
+  border: "1px solid var(--dash-border)",
+  background: "var(--dash-card)",
+  color: "var(--dash-ink)",
   fontSize: 13,
   cursor: "pointer",
-};
-
-const linkBtn: React.CSSProperties = {
-  ...secondaryBtnSmall,
-  textDecoration: "none",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  color: "#111827",
 };

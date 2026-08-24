@@ -1,5 +1,6 @@
 import { createRoot, hydrateRoot } from "react-dom/client";
 import Main from "./main";
+import "./style/aura-theme.css";
 
 // Get the root element where the app will be rendered
 const rootElement = document.getElementById("app") as HTMLElement;

@@ -9,8 +9,10 @@ const ORDER: { key: AuctionTab; label: string }[] = [
   { key: "draft", label: "Draft" },
   { key: "scheduled", label: "Scheduled" },
   { key: "live", label: "Live" },
+  { key: "paused", label: "Paused" },
   { key: "ended", label: "Ended" },
   { key: "cancelled", label: "Cancelled" },
+  { key: "archived", label: "Archived" },
 ];
 
 export function AuctionsTabs({
@@ -37,7 +39,7 @@ export function AuctionsTabs({
             <span>{t.label}</span>
 
             {typeof count === "number" && (
-              <span className="tabs__count"> { count}</span>
+              <span className="tabs__count"> {count}</span>
             )}
           </button>
         );

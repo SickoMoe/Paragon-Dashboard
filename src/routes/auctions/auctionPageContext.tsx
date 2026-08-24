@@ -1,14 +1,24 @@
 // src/routes/dashboard/DashboardPageContext.tsx
 import React, { createContext, useContext, useEffect } from "react";
-import { useDashboardController } from "../../core/hooks/useDashboardController";
-import { AuctionOverview } from "../../features/auctions/types";
+import {
+  useDashboardController,
+  type AuctionTab,
+} from "../../core/hooks/useDashboardController";
+import type { AuctionOverview } from "../../features/auctions/types";
+import { useAuctionRealtime } from "../../features/auctions/hooks/useAuctionRealtime";
 
 interface DashboardPageContextValue {
   auctions: AuctionOverview[];
+  filteredAuctions: AuctionOverview[];
   selectedAuction: AuctionOverview | null;
+  tab: AuctionTab;
+  setTab: React.Dispatch<React.SetStateAction<AuctionTab>>;
+  search: string;
+  setSearch: React.Dispatch<React.SetStateAction<string>>;
   handleRowClick: (auction: AuctionOverview) => void;
   handleUpdate: (updated: AuctionOverview) => void;
   handleDelete: (id: string) => void;
+  handleCreated: (row: AuctionOverview) => void;
   closeDrawer: () => void;
 }
 
@@ -27,20 +37,45 @@ interface AuctionPageProviderProps {
   children: React.ReactNode;
 }
 
-export const AuctionPageProvider: React.FC<AuctionPageProviderProps> = ({ initialAuctions, children }) => {
-  const { auctions, selectedAuction, handleRowClick, handleUpdate, handleDelete, closeDrawer, replaceAuctions } =
-    useDashboardController(initialAuctions);
+export const AuctionPageProvider: React.FC<AuctionPageProviderProps> = ({
+  initialAuctions,
+  children,
+}) => {
+  const {
+    auctions,
+    filteredAuctions,
+    selectedAuction,
+    tab,
+    setTab,
+    search,
+    setSearch,
+    replaceAuctions,
+    handleRowClick,
+    handleUpdate,
+    handleDelete,
+    handleCreated,
+    closeDrawer,
+    handleRealtimeEvent,
+  } = useDashboardController(initialAuctions);
 
   useEffect(() => {
     replaceAuctions(initialAuctions);
   }, [initialAuctions, replaceAuctions]);
 
+  useAuctionRealtime(handleRealtimeEvent);
+
   const value: DashboardPageContextValue = {
     auctions,
+    filteredAuctions,
     selectedAuction,
+    tab,
+    setTab,
+    search,
+    setSearch,
     handleRowClick,
     handleUpdate,
     handleDelete,
+    handleCreated,
     closeDrawer,
   };
 

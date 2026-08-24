@@ -1,6 +1,6 @@
 import { BASE_URL } from "../../core/const";
 import { AuctionOverview } from "../../features/auctions/types";
-import {request} from "../../core/api/request.ts"
+import { request } from "../../core/api/request";
 
 // src/routes/dashboard/loader.ts
 export const auctionLoader = async (): Promise<AuctionOverview[]> => {

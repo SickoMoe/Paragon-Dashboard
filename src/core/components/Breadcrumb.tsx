@@ -1,5 +1,4 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 
 type Mode = "overview" | "edit";
 
@@ -7,18 +6,21 @@ type Props = {
   auctionId: string;
   mode: Mode;
   onGoOverview: () => void;
+  onGoAuctions: () => void;
+  onClose: () => void;
 };
 
 export function AuctionDrawerBreadcrumb({
   auctionId,
   mode,
   onGoOverview,
+  onGoAuctions,
+  onClose,
 }: Props) {
-  const navigate = useNavigate()
   return (
     <div style={styles.wrap}>
       <div style={styles.path}>
-        <span style={styles.link} onClick={()=>navigate("auctions")}>
+        <span style={styles.link} onClick={onGoAuctions}>
           Auctions
         </span>
 
@@ -39,17 +41,25 @@ export function AuctionDrawerBreadcrumb({
         )}
       </div>
 
-      <button onClick={()=>navigate("")} style={styles.close}>×</button>
+      <button onClick={onClose} style={styles.close} aria-label="Close auction drawer" title="Close">
+        ×
+      </button>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
   wrap: {
+    position: "sticky",
+    top: 0,
+    zIndex: 2,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    margin: "-18px -18px 14px",
+    padding: "12px 18px",
+    borderBottom: "1px solid var(--dash-border)",
+    background: "var(--dash-card)",
   },
   path: {
     display: "flex",
@@ -58,22 +68,22 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
   },
   link: {
-    color: "#2563eb",
+    color: "var(--dash-muted)",
     cursor: "pointer",
     fontWeight: 600,
   },
   current: {
-    color: "#111827",
+    color: "var(--dash-ink)",
     fontWeight: 700,
   },
   sep: {
-    color: "#9ca3af",
+    color: "var(--dash-subtle)",
   },
   close: {
     fontSize: 22,
     border: "none",
     background: "transparent",
     cursor: "pointer",
-    color: "#9ca3af",
+    color: "var(--dash-muted)",
   },
 };

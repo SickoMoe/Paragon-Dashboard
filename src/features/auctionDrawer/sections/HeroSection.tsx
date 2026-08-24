@@ -1,6 +1,7 @@
 // src/routes/dashboard/components/auctionDrawer/sections/HeroSection.tsx
 import React from "react";
 import { AuctionOverview } from "../../auctions/types";
+import { getListingThumbnail } from "../../auctions/utils/listingMedia";
 
 type Props = {
   row: AuctionOverview;
@@ -22,7 +23,7 @@ export function HeroSection({
   onEnd,
   onViewBids,
 }: Props) {
-  const img = row.listing?.media?.images?.[0] ?? "";
+  const img = getListingThumbnail(row.listing);
   const title = row.listing?.basicInformation?.title ?? "Untitled listing";
 
   const loc = row.listing?.basicInformation?.location;
@@ -74,14 +75,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     borderRadius: 16,
     overflow: "hidden",
-    border: "1px solid #eef0f4",
-    background: "#fff",
+    border: "1px solid var(--dash-border)",
+    background: "var(--dash-card)",
   },
 
   imageWrap: {
     position: "relative",
     height: 160,
-    background: "#f3f4f6",
+    background: "var(--dash-surface)",
   },
   image: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
   imageFallback: { width: "100%", height: "100%" },
@@ -96,7 +97,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 999,
     border: "1px solid rgba(255,255,255,0.55)",
     background: "rgba(17,24,39,0.55)",
-    color: "#fff",
+    color: "var(--dash-card)",
     cursor: "pointer",
     fontSize: 20,
     lineHeight: "34px",
@@ -113,18 +114,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     border: "1px solid rgba(255,255,255,0.55)",
     background: "rgba(255,255,255,0.92)",
-    color: "#111827",
+    color: "var(--dash-ink)",
     fontWeight: 800,
     textTransform: "capitalize",
   },
 
   body: {
     padding: 14,
-    borderTop: "1px solid #eef0f4",
+    borderTop: "1px solid var(--dash-border)",
   },
 
-  title: { fontSize: 16, fontWeight: 800, color: "#111827" },
-  muted: { fontSize: 12, color: "#6b7280", marginTop: 4 },
+  title: { fontFamily: "var(--dash-font-display)", fontSize: 22, fontWeight: 600, color: "var(--dash-ink)", letterSpacing: 0 },
+  muted: { fontSize: 12, color: "var(--dash-muted)", marginTop: 4 },
 
   actionsRow: {
     marginTop: 12,
@@ -138,9 +139,9 @@ const btn: Record<string, React.CSSProperties> = {
     flex: 1,
     padding: "10px 12px",
     borderRadius: 10,
-    border: "1px solid #111827",
-    background: "#111827",
-    color: "#fff",
+    border: "1px solid var(--dash-ink)",
+    background: "var(--dash-ink)",
+    color: "var(--dash-card)",
     cursor: "pointer",
     fontSize: 13,
     fontWeight: 700,
@@ -149,9 +150,9 @@ const btn: Record<string, React.CSSProperties> = {
     flex: 1,
     padding: "10px 12px",
     borderRadius: 10,
-    border: "1px solid #eef0f4",
-    background: "#fff",
-    color: "#111827",
+    border: "1px solid var(--dash-border)",
+    background: "var(--dash-card)",
+    color: "var(--dash-ink)",
     cursor: "pointer",
     fontSize: 13,
     fontWeight: 700,

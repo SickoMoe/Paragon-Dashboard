@@ -17,7 +17,7 @@ export type BidderApplication = {
 function Detail({ label, value }: { label: string; value?: string }) {
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: "#6b7280" }}>{label}</div>
+      <div style={{ fontSize: 12, color: "var(--dash-muted)" }}>{label}</div>
       <div style={{ fontWeight: 600 }}>{value ?? "—"}</div>
     </div>
   );
@@ -26,12 +26,12 @@ function Detail({ label, value }: { label: string; value?: string }) {
 function Badge({ status }: { status: BidderApplication["status"] }) {
   const ui =
     status === "pending"
-      ? { bg: "#FEF3C7", fg: "#92400E", label: "Pending" }
+      ? { bg: "rgba(212, 165, 116, 0.18)", fg: "var(--dash-warning)", label: "Pending" }
       : status === "approved"
-      ? { bg: "#DCFCE7", fg: "#166534", label: "Approved" }
+      ? { bg: "rgba(63, 127, 95, 0.14)", fg: "var(--dash-success)", label: "Approved" }
       : status === "rejected"
-      ? { bg: "#FEE2E2", fg: "#991B1B", label: "Rejected" }
-      : { bg: "#E5E7EB", fg: "#374151", label: "Suspended" };
+      ? { bg: "rgba(212, 24, 61, 0.1)", fg: "var(--dash-danger)", label: "Rejected" }
+      : { bg: "var(--dash-surface)", fg: "var(--dash-ink-soft)", label: "Suspended" };
 
   return (
     <span
@@ -92,7 +92,7 @@ export default function BidderApplicationDrawer({
 
   const payloadEntries = useMemo(() => {
     if (!app?.payload) return [];
-    return Object.entries(app.payload).filter(([_, v]) => v !== undefined);
+    return Object.entries(app.payload).filter(([, v]) => v !== undefined);
   }, [app?.payload]);
 
   async function decide(kind: "approve" | "reject" | "suspend") {
@@ -113,7 +113,7 @@ export default function BidderApplicationDrawer({
     }
   }
 
-  // ✅ which actions should show based on status
+  // Show only the moderation actions that apply to the current status.
   const actions = useMemo(() => {
     if (!app) return [];
 
@@ -150,7 +150,7 @@ export default function BidderApplicationDrawer({
   return (
     <Drawer open={open} onClose={onClose} title={title} size={520} zIndex={70}>
       {!app ? (
-        <div style={{ color: "#6b7280" }}>No application selected.</div>
+        <div style={{ color: "var(--dash-muted)" }}>No application selected.</div>
       ) : (
         <div>
           <div
@@ -162,12 +162,12 @@ export default function BidderApplicationDrawer({
             }}
           >
             <Badge status={app.status} />
-            <div style={{ fontSize: 12, color: "#6b7280" }}>
+            <div style={{ fontSize: 12, color: "var(--dash-muted)" }}>
               {app.status === "pending" ? "Awaiting decision" : "Decision recorded"}
             </div>
           </div>
 
-          {error ? <div style={{ color: "#b91c1c", marginBottom: 12 }}>{error}</div> : null}
+          {error ? <div style={{ color: "var(--dash-danger)", marginBottom: 12 }}>{error}</div> : null}
 
           <Detail label="Application ID" value={app.applicationId} />
           <Detail label="Account ID" value={app.accountId} />
@@ -179,20 +179,20 @@ export default function BidderApplicationDrawer({
 
           {app.decisionNote ? (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Decision note</div>
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, fontSize: 13 }}>
+              <div style={{ fontSize: 12, color: "var(--dash-muted)", marginBottom: 6 }}>Decision note</div>
+              <div style={{ border: "1px solid var(--dash-border)", borderRadius: 10, padding: 10, fontSize: 13 }}>
                 {app.decisionNote}
               </div>
             </div>
           ) : null}
 
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>Application details</div>
+            <div style={{ fontSize: 12, color: "var(--dash-muted)", marginBottom: 8 }}>Application details</div>
 
             {!payloadEntries.length ? (
-              <div style={{ color: "#6b7280", fontSize: 13 }}>No form details captured.</div>
+              <div style={{ color: "var(--dash-muted)", fontSize: 13 }}>No form details captured.</div>
             ) : (
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ border: "1px solid var(--dash-border)", borderRadius: 12, overflow: "hidden" }}>
                 {payloadEntries.map(([k, v], idx) => (
                   <div
                     key={k}
@@ -201,19 +201,19 @@ export default function BidderApplicationDrawer({
                       gridTemplateColumns: "160px 1fr",
                       gap: 10,
                       padding: "10px 12px",
-                      borderTop: idx === 0 ? "none" : "1px solid #f3f4f6",
-                      background: "#fff",
+                      borderTop: idx === 0 ? "none" : "1px solid var(--dash-surface)",
+                      background: "var(--dash-card)",
                     }}
                   >
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>{prettyLabel(k)}</div>
-                    <div style={{ fontSize: 13, color: "#111827", fontWeight: 600 }}>{formatAny(v)}</div>
+                    <div style={{ fontSize: 12, color: "var(--dash-muted)" }}>{prettyLabel(k)}</div>
+                    <div style={{ fontSize: 13, color: "var(--dash-ink)", fontWeight: 600 }}>{formatAny(v)}</div>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* ✅ dynamic actions */}
+          {/* Status-aware actions */}
           <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
             {actions.map((a) => (
               <button
@@ -223,9 +223,9 @@ export default function BidderApplicationDrawer({
                 style={{
                   padding: "10px 12px",
                   borderRadius: 10,
-                  border: "1px solid #e5e7eb",
-                  background: a.variant === "solid" ? "#111827" : "#fff",
-                  color: a.variant === "solid" ? "#fff" : "#111827",
+                  border: "1px solid var(--dash-border)",
+                  background: a.variant === "solid" ? "var(--dash-ink)" : "var(--dash-card)",
+                  color: a.variant === "solid" ? "var(--dash-card)" : "var(--dash-ink)",
                   cursor: saving ? "not-allowed" : "pointer",
                   opacity: saving ? 0.6 : 1,
                 }}
@@ -235,7 +235,7 @@ export default function BidderApplicationDrawer({
             ))}
           </div>
 
-          {saving ? <div style={{ marginTop: 10, color: "#6b7280" }}>Saving…</div> : null}
+          {saving ? <div style={{ marginTop: 10, color: "var(--dash-muted)" }}>Saving…</div> : null}
         </div>
       )}
     </Drawer>

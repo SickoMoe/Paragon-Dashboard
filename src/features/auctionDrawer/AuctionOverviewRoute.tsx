@@ -1,24 +1,69 @@
 // routes/auctions/AuctionOverviewRoute.tsx
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useRevalidator } from "react-router-dom";
 import { useDashboardPageContext } from "../../routes/auctions/auctionPageContext";
 import { AuctionOverviewPanel } from "./AuctionOverviewPanel";
+import { useAuctionDrawerController } from "../auctions/hooks/useAuctionDrawerController";
+import type { AuctionOverview } from "../auctions/types";
 
 export default function AuctionOverviewRoute() {
-  const navigate = useNavigate();
   const { auctionId } = useParams<{ auctionId: string }>();
-  const { auctions } = useDashboardPageContext();
+  const { auctions, handleUpdate, handleDelete } = useDashboardPageContext();
 
   if (!auctionId) return null;
 
   const row = auctions.find((a) => a.auction.id === auctionId);
   if (!row) return null;
+
+  return (
+    <AuctionOverviewRouteContent
+      row={row}
+      onUpdate={handleUpdate}
+      onDelete={handleDelete}
+    />
+  );
+}
+
+function AuctionOverviewRouteContent({
+  row,
+  onUpdate,
+  onDelete,
+}: {
+  row: AuctionOverview;
+  onUpdate: (updated: AuctionOverview) => void;
+  onDelete: (id: string) => void;
+}) {
+  const navigate = useNavigate();
+  const { revalidate } = useRevalidator();
+  const ctrl = useAuctionDrawerController(
+    row,
+    (updated) => {
+      onUpdate(updated);
+      revalidate();
+    },
+    onDelete,
+    () => navigate("/auctions"),
+  );
+
   return (
     <AuctionOverviewPanel
       row={row}
+      loading={ctrl.loading}
+      error={ctrl.auctionError}
       onViewBids={() => navigate("leaderboard")}
       onEdit={() => navigate("edit")}
-      onEnd={() => console.log("end")}
-      onDelete={() => console.log("delete")}
+      onSubmit={ctrl.handleSubmit}
+      onWithdraw={ctrl.handleWithdraw}
+      onApprove={ctrl.handleApprove}
+      onRequestChanges={ctrl.handleRequestChanges}
+      onReject={ctrl.handleReject}
+      onPublish={ctrl.handlePublish}
+      onPause={ctrl.handlePause}
+      onResume={ctrl.handleResume}
+      onEnd={ctrl.handleEnd}
+      onCancelAuction={ctrl.handleCancelAuction}
+      onArchive={ctrl.handleArchive}
+      onRelist={ctrl.handleRelist}
+      onDelete={ctrl.handleDeleteClick}
     />
   );
 }

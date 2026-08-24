@@ -1,6 +1,6 @@
-import { Outlet, useLoaderData, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { BidDetailPanel } from "./BidDetailPanel";
-import { AuctionLeaderboardDTO, BidDTO } from "../auctions/services/auctionBidApi";
+import { BidDTO } from "../auctions/services/auctionBidApi";
 
 export default function BidDetailRoute() {
   const navigate = useNavigate();

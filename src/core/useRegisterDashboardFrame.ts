@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useDashboardFrame } from "./frameContext";
-import { DashboardFrameConfig } from "./DashboardFrameConfig";
+import type { DashboardFrameConfig } from "./DashboardFrameConfig";
 
-export function useRegisterDashboardFrame(frame: any) {
+export function useRegisterDashboardFrame(frame: DashboardFrameConfig) {
   const { setFrame } = useDashboardFrame();
 
   useEffect(() => {

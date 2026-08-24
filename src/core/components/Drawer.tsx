@@ -65,15 +65,17 @@ export default function Drawer(props: {
 
   const panelStyle: React.CSSProperties = {
     position: "absolute",
-    top: 0,
-    bottom: 0,
+    top: 12,
+    bottom: 12,
     width,
-    background: "#fff",
+    background: "var(--dash-card)",
     boxShadow:
       side === "right"
-        ? "-12px 0 30px rgba(0,0,0,0.25)"
-        : "12px 0 30px rgba(0,0,0,0.25)",
-    padding: 16,
+        ? "-18px 0 44px rgba(44,44,44,0.18)"
+        : "18px 0 44px rgba(44,44,44,0.18)",
+    border: "1px solid var(--dash-border)",
+    borderRadius: side === "right" ? "12px 0 0 12px" : "0 12px 12px 0",
+    padding: 18,
     overflowY: "auto",
     ...(side === "right" ? { right: rightOffset } : { left: leftOffset }),
   };
@@ -85,7 +87,8 @@ export default function Drawer(props: {
         style={{
           position: "absolute",
           inset: 0,
-          background: "rgba(0,0,0,0.35)",
+          background: "rgba(44,44,44,0.28)",
+          backdropFilter: "blur(3px)",
         }}
       />
 
@@ -111,7 +114,7 @@ export default function Drawer(props: {
                   background: "transparent",
                   fontSize: 22,
                   cursor: "pointer",
-                  color: "#9ca3af",
+                  color: "var(--dash-muted)",
                 }}
                 aria-label="Close"
                 title="Close"
@@ -129,7 +132,7 @@ export default function Drawer(props: {
                 background: "transparent",
                 fontSize: 22,
                 cursor: "pointer",
-                color: "#9ca3af",
+                color: "var(--dash-muted)",
               }}
               aria-label="Close"
               title="Close"

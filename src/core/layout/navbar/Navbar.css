@@ -4,14 +4,15 @@
   position: sticky;
   top: 0;
   width: 100%;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
+  z-index: 20;
+  background: var(--dash-card);
+  border-bottom: 1px solid var(--dash-border);
 }
 
 .nav-inner {
-  max-width: 1200px;
+  width: min(1440px, calc(100% - 48px));
   margin: 0 auto;
-  padding: 12px 16px;
+  padding: 12px 0;
 
   display: flex;
   align-items: center;
@@ -22,7 +23,7 @@
 .nav-left {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 28px;
   min-width: 0;
 }
 
@@ -31,48 +32,56 @@
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  color: #111827;
-  font-weight: 700;
+  color: var(--dash-ink);
+  font-weight: 600;
 }
 
 .nav-brand__mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  background: #111827;
-  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--dash-radius);
+  background: var(--dash-primary);
+  color: var(--dash-primary-fg);
+  display: grid;
+  place-items: center;
+  font-family: var(--dash-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  box-shadow: var(--dash-shadow-sm);
 }
 
 .nav-brand__text {
-  font-size: 14px;
-  letter-spacing: 0.2px;
+  font-family: var(--dash-font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   flex-wrap: wrap;
 }
 
 .nav-link {
   text-decoration: none;
-  color: #374151;
+  color: var(--dash-muted);
   font-size: 13px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid transparent;
+  font-weight: 600;
+  padding: 8px 0;
+  border-radius: 0;
+  border: 0;
 }
 
 .nav-link:hover {
-  background: #f9fafb;
-  border-color: #e5e7eb;
+  background: transparent;
+  color: var(--dash-ink);
 }
 
 .nav-link--active {
-  background: #111827;
-  color: #fff;
-  border-color: #111827;
+  background: transparent;
+  color: var(--dash-ink);
 }
 
 .nav-right {
@@ -89,19 +98,33 @@
 
 .nav-btn {
   text-decoration: none;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  color: #111827;
-  padding: 8px 10px;
-  border-radius: 10px;
+  border: 1px solid var(--dash-border);
+  background: var(--dash-card);
+  color: var(--dash-ink);
+  padding: 9px 12px;
+  border-radius: var(--dash-radius);
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .nav-btn--active {
-  border-color: #111827;
+  border-color: var(--dash-primary);
 }
 
 .nav-btn--ghost {
-  background: #f9fafb;
+  background: var(--dash-surface);
+}
+
+@media (max-width: 760px) {
+  .nav-inner {
+    width: min(100% - 32px, 1440px);
+    align-items: flex-start;
+  }
+
+  .nav-left {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
 }

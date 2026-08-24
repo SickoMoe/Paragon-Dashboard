@@ -12,9 +12,8 @@ export const configureStoreWithPreloadedState = (
   });
 };
 
-const store = configureStoreWithPreloadedState();
-
-export type AppDispatch = typeof store.dispatch;
+export type AppStore = ReturnType<typeof configureStoreWithPreloadedState>;
+export type AppDispatch = AppStore["dispatch"];
 export type AppThunk = ThunkAction<void, RootState, unknown, Action<string>>;
 
 export default configureStoreWithPreloadedState;

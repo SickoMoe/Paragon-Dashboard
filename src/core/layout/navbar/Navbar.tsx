@@ -25,6 +25,7 @@ export default function NavBar({ isAuthed = false, onLogout }: Props) {
       <div className="nav-inner">
         <div className="nav-left">
           <Link className="nav-brand" to="/">
+            <span className="nav-brand__mark">P</span>
             <span className="nav-brand__text">Paragon</span>
           </Link>
 

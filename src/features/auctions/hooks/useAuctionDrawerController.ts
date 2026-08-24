@@ -5,16 +5,42 @@ import type { IListing } from "../../../interfaces/IListing";
 
 import {
   updateAuctionSchedule,
+  submitAuction,
+  withdrawAuction,
+  approveAuction,
+  requestAuctionChanges,
+  rejectAuction,
   publishAuction,
+  pauseAuction,
+  resumeAuction,
   endAuction,
+  cancelAuction,
+  archiveAuction,
+  relistAuction,
   deleteAuction,
   patchAuction,
+  patchAuctionDraft,
+  fetchAuctionDraftReadiness,
   type AuctionPatch,
+  type AuctionDraftRecord,
+  type AuctionDraftReadiness,
 } from "../services/auctionDashboardApi";
 import { AuctionLeaderboardDTO, fetchAuctionBids } from "../services/auctionBidApi";
-import { ListingPatch, patchListing, type ListingModerationStatus } from "../../listingApi";
+import {
+  ListingPatch,
+  approveListingDraft,
+  patchListing,
+  rejectListingDraft,
+  requestListingDraftChanges,
+  updateListingReviewRequest,
+  updateListingStatus,
+  type ListingDraftReviewResult,
+  type ListingModerationStatus,
+  type ListingReviewFieldIssue,
+  type ListingReviewRequest,
+} from "../../listingApi";
 import { AuctionOverview } from "../types";
-type DrawerMode = "overview" | "edit";
+import { getListingThumbnailPath } from "../utils/listingMedia";
 export function useAuctionDrawerController(
   row: AuctionOverview,
   onUpdate: (updated: AuctionOverview) => void,
@@ -25,6 +51,10 @@ export function useAuctionDrawerController(
   const [listingSaving, setListingSaving] = useState(false);
   const loading = auctionLoading || listingSaving;
   const [saveSucceeded, setSaveSucceeded] = useState(false);
+  const [auctionError, setAuctionError] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<AuctionDraftReadiness | null>(null);
+  const [readinessLoading, setReadinessLoading] = useState(false);
+  const [readinessError, setReadinessError] = useState<string | null>(null);
 
   const auction = row.auction;
 
@@ -49,6 +79,7 @@ export function useAuctionDrawerController(
     auction.rules?.bidIncrement != null ? String(auction.rules.bidIncrement) : "",
   );
   const [status, setStatus] = useState<IAuction["status"]>(auction.status);
+  const [isPrivate, setIsPrivate] = useState<boolean>(Boolean(auction.isPrivate));
 
   const [listing, setListing] = useState<IListing | null>(row.listing ?? null);
   const [title, setTitle] = useState("");
@@ -57,26 +88,13 @@ export function useAuctionDrawerController(
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zipcode, setZipcode] = useState("");
-  const [primaryImage, setPrimaryImage] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [moderationStatus, setModerationStatus] = useState<ListingModerationStatus>(
     normalizeModerationStatus(row.listing?.moderationStatus ?? row.listing?.tags?.status),
   );
 
-  useEffect(() => {
-    setEditingSchedule(false);
-    setEditingDetails(false);
-    setStartDate(auction.startDate ? toLocalInput(auction.startDate) : "");
-    setEndDate(auction.endDate ? toLocalInput(auction.endDate) : "");
-
-    setListingId(auction.listingId ?? "");
-    setStartingBid(auction.startingBid != null ? String(auction.startingBid) : "");
-    setIncrement(auction.rules?.bidIncrement != null ? String(auction.rules.bidIncrement) : "");
-    setStatus(auction.status);
-
-    setListing(row.listing ?? null);
-
-    const l = row.listing;
-    const bi = l?.basicInformation;
+  function syncListingFields(nextListing?: IListing | null) {
+    const bi = nextListing?.basicInformation;
     const loc = bi?.location;
 
     setTitle(bi?.title ?? "");
@@ -85,8 +103,25 @@ export function useAuctionDrawerController(
     setCity(loc?.city ?? "");
     setState(loc?.state ?? "");
     setZipcode(loc?.zipcode ?? "");
-    setPrimaryImage(l?.media?.images?.[0] ?? "");
-    setModerationStatus(normalizeModerationStatus(l?.moderationStatus ?? l?.tags?.status));
+    setThumbnailUrl(getListingThumbnailPath(nextListing));
+    setModerationStatus(normalizeModerationStatus(nextListing?.moderationStatus ?? nextListing?.tags?.status));
+  }
+
+  useEffect(() => {
+    setEditingSchedule(false);
+    setAuctionError(null);
+    setEditingDetails(false);
+    setStartDate(auction.startDate ? toLocalInput(auction.startDate) : "");
+    setEndDate(auction.endDate ? toLocalInput(auction.endDate) : "");
+
+    setListingId(auction.listingId ?? "");
+    setStartingBid(auction.startingBid != null ? String(auction.startingBid) : "");
+    setIncrement(auction.rules?.bidIncrement != null ? String(auction.rules.bidIncrement) : "");
+    setStatus(auction.status);
+    setIsPrivate(Boolean(auction.isPrivate));
+
+    setListing(row.listing ?? null);
+    syncListingFields(row.listing);
   }, [auction.id]); // ok
 
   const listingLoading = false;
@@ -101,16 +136,6 @@ export function useAuctionDrawerController(
       (auction.startDate ? toLocalInput(auction.startDate) : "") !== startDate ||
       (auction.endDate ? toLocalInput(auction.endDate) : "") !== endDate;
 
-    const listingChanged =
-      (currentListing?.basicInformation?.title ?? "") !== title ||
-      (currentListing?.basicInformation?.type ?? "") !== type ||
-      (currentListing?.basicInformation?.location?.address ?? "") !== address ||
-      (currentListing?.basicInformation?.location?.city ?? "") !== city ||
-      (currentListing?.basicInformation?.location?.state ?? "") !== state ||
-      (currentListing?.basicInformation?.location?.zipcode ?? "") !== zipcode ||
-      (currentListing?.media?.images?.[0] ?? "") !== primaryImage ||
-      normalizeModerationStatus(currentListing?.moderationStatus ?? currentListing?.tags?.status) !== moderationStatus;
-
     const nextListingId = listingId.trim();
     const bidRaw = startingBid.trim();
     const incRaw = increment.trim();
@@ -122,33 +147,50 @@ export function useAuctionDrawerController(
       incRaw !== "" && Number.isFinite(Number(incRaw)) && Number(incRaw) !== Number(auction.rules?.bidIncrement ?? 0);
 
     const listingIdChanged = nextListingId !== (auction.listingId ?? "");
-    const statusChanged = status !== auction.status;
-
-    return scheduleChanged || listingChanged || bidChanged || incChanged || listingIdChanged || statusChanged;
+    const privacyChanged = isPrivate !== Boolean(auction.isPrivate);
+    return scheduleChanged || bidChanged || incChanged || listingIdChanged || privacyChanged;
   }, [
     auction.startDate,
     auction.endDate,
     auction.startingBid,
     auction.rules?.bidIncrement,
     auction.listingId,
-    auction.status,
+    auction.isPrivate,
     startDate,
     endDate,
-    row.listing,
-    listing,
-    title,
-    type,
-    address,
-    city,
-    state,
-    zipcode,
-    primaryImage,
-    moderationStatus,
     listingId,
     startingBid,
     increment,
-    status,
+    isPrivate,
   ]);
+
+  useEffect(() => {
+    const draftId = row.auctionDraft?.id;
+    if (!draftId) {
+      setReadiness(null);
+      setReadinessError(null);
+      setReadinessLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setReadinessLoading(true);
+    setReadinessError(null);
+    fetchAuctionDraftReadiness(draftId)
+      .then((next) => {
+        if (!cancelled) setReadiness(next);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setReadinessError(getErrorMessage(err, "Failed to load draft readiness"));
+      })
+      .finally(() => {
+        if (!cancelled) setReadinessLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [row.auctionDraft?.id, row.auctionDraft?.updatedAt]);
 
   function handleCancelEdit() {
     if (!hasUnsavedChanges) {
@@ -192,27 +234,166 @@ export function useAuctionDrawerController(
     };
   }
 
-  async function handlePublish() {
+  function mergeAuctionDraftRow(nextDraft: AuctionDraftRecord): AuctionOverview {
+    const nextAuction: IAuction = {
+      ...auction,
+      listingId: nextDraft.payload.listingId,
+      startDate: nextDraft.payload.startDate,
+      endDate: nextDraft.payload.endDate,
+      startingBid: nextDraft.payload.startingBid ?? 0,
+      isPrivate: nextDraft.payload.isPrivate ?? false,
+      status: "draft",
+      updatedAt: nextDraft.updatedAt,
+      rules: {
+        ...auction.rules,
+        bidIncrement: nextDraft.payload.rules?.bidIncrement ?? auction.rules?.bidIncrement ?? 0,
+      },
+    };
+
+    return {
+      ...row,
+      auction: nextAuction,
+      auctionDraft: nextDraft,
+      bid: {
+        ...row.bid,
+        openingBid: nextAuction.startingBid ?? 0,
+        currentBid: nextAuction.startingBid ?? 0,
+        incrementAmount: nextAuction.rules?.bidIncrement ?? 0,
+      },
+    };
+  }
+
+  function buildAuctionDraftPayload() {
+    const base = row.auctionDraft?.payload ?? { listingId: auction.listingId };
+    const bidRaw = startingBid.trim();
+    const incRaw = increment.trim();
+
+    return {
+      ...base,
+      listingId: listingId.trim() || base.listingId || auction.listingId,
+      startingBid:
+        bidRaw !== "" && Number.isFinite(Number(bidRaw))
+          ? Number(bidRaw)
+          : base.startingBid,
+      rules: {
+        ...(base.rules ?? {}),
+        bidIncrement:
+          incRaw !== "" && Number.isFinite(Number(incRaw))
+            ? Number(incRaw)
+            : base.rules?.bidIncrement,
+      },
+      startDate: startDate ? new Date(startDate).toISOString() : base.startDate,
+      endDate: endDate ? new Date(endDate).toISOString() : base.endDate,
+      isPrivate,
+      status: "draft" as const,
+    };
+  }
+
+  async function handleSaveAuctionDraftAll() {
+    if (!row.auctionDraft) return;
     setAuctionLoading(true);
+    setAuctionError(null);
+    setSaveSucceeded(false);
     try {
-      const nextAuction = await publishAuction(auction.id); // IAuction
-      onUpdate(mergeRow(nextAuction));
+      const updatedDraft = await patchAuctionDraft(row.auctionDraft.id, buildAuctionDraftPayload());
+      const nextReadiness = await fetchAuctionDraftReadiness(updatedDraft.id);
+      setReadiness(nextReadiness);
+      onUpdate(mergeAuctionDraftRow(updatedDraft));
+      setSaveSucceeded(true);
+    } catch (err: any) {
+      setAuctionError(getErrorMessage(err, "Failed to save auction draft"));
     } finally {
       setAuctionLoading(false);
     }
   }
 
-  async function handleEnd() {
+  async function runAuctionAction(
+    action: () => Promise<IAuction>,
+    fallback: string,
+  ) {
     setAuctionLoading(true);
+    setAuctionError(null);
     try {
-      const nextAuction = await endAuction(auction.id); // IAuction
+      const nextAuction = await action();
       onUpdate(mergeRow(nextAuction));
+    } catch (err: any) {
+      setAuctionError(getErrorMessage(err, fallback));
+    } finally {
+      setAuctionLoading(false);
+    }
+  }
+
+  async function handleSubmit() {
+    await runAuctionAction(() => submitAuction(auction.id), "Failed to submit auction");
+  }
+
+  async function handleWithdraw() {
+    await runAuctionAction(() => withdrawAuction(auction.id), "Failed to withdraw auction");
+  }
+
+  async function handleApprove() {
+    await runAuctionAction(() => approveAuction(auction.id), "Failed to approve auction");
+  }
+
+  async function handleRequestChanges() {
+    const reason = promptReason("Change request");
+    if (!reason) return;
+    await runAuctionAction(() => requestAuctionChanges(auction.id, reason), "Failed to request changes");
+  }
+
+  async function handleReject() {
+    const reason = promptReason("Rejection");
+    if (!reason) return;
+    await runAuctionAction(() => rejectAuction(auction.id, reason), "Failed to reject auction");
+  }
+
+  async function handlePublish() {
+    await runAuctionAction(() => publishAuction(auction.id), "Failed to publish auction");
+  }
+
+  async function handlePause() {
+    const reason = promptReason("Pause");
+    if (!reason) return;
+    await runAuctionAction(() => pauseAuction(auction.id, reason), "Failed to pause auction");
+  }
+
+  async function handleResume() {
+    await runAuctionAction(() => resumeAuction(auction.id), "Failed to resume auction");
+  }
+
+  async function handleEnd() {
+    await runAuctionAction(() => endAuction(auction.id), "Failed to end auction");
+  }
+
+  async function handleCancelAuction() {
+    const reason = promptReason("Cancellation");
+    if (!reason) return;
+    await runAuctionAction(() => cancelAuction(auction.id, reason), "Failed to cancel auction");
+  }
+
+  async function handleArchive() {
+    await runAuctionAction(() => archiveAuction(auction.id), "Failed to archive auction");
+  }
+
+  async function handleRelist() {
+    setAuctionLoading(true);
+    setAuctionError(null);
+    try {
+      const nextRow = await relistAuction(auction.id);
+      onUpdate(nextRow);
+    } catch (err: any) {
+      setAuctionError(getErrorMessage(err, "Failed to relist auction"));
     } finally {
       setAuctionLoading(false);
     }
   }
 
   async function handleScheduleSave() {
+    if (row.auctionDraft) {
+      await handleSaveAuctionDraftAll();
+      return;
+    }
+
     if (!startDate || !endDate) return;
 
     const s = new Date(startDate).getTime();
@@ -234,6 +415,11 @@ export function useAuctionDrawerController(
   }
 
   async function handleSaveDetails() {
+    if (row.auctionDraft) {
+      await handleSaveAuctionDraftAll();
+      return;
+    }
+
     const patch: AuctionPatch = {};
 
     const nextListingId = listingId.trim();
@@ -259,8 +445,8 @@ export function useAuctionDrawerController(
       }
     }
 
-    if (status !== auction.status) {
-      patch.status = status;
+    if (isPrivate !== Boolean(auction.isPrivate)) {
+      patch.isPrivate = isPrivate;
     }
 
     if (Object.keys(patch).length === 0) {
@@ -279,34 +465,33 @@ export function useAuctionDrawerController(
   }
 
   async function handleDeleteClick() {
-    if (!onDelete) return;
-
     setAuctionLoading(true);
+    setAuctionError(null);
     try {
-      await deleteAuction(auction.id);
-      onDelete(auction.id);
+      const result = await deleteAuction(auction.id);
+      if (result?.mode === "archived" && result.auction) {
+        onUpdate(mergeRow(result.auction));
+        return;
+      }
+      onDelete?.(auction.id);
       onClose?.();
+    } catch (err: any) {
+      setAuctionError(getErrorMessage(err, "Failed to delete auction"));
     } finally {
       setAuctionLoading(false);
     }
   }
   async function handleSaveAll() {
+    if (row.auctionDraft) {
+      await handleSaveAuctionDraftAll();
+      return;
+    }
+
     setSaveSucceeded(false);
     // Save schedule if valid + changed
     const scheduleChanged =
       (auction.startDate ? toLocalInput(auction.startDate) : "") !== startDate ||
       (auction.endDate ? toLocalInput(auction.endDate) : "") !== endDate;
-
-    // Save listing if changed (at least title here; add other fields as you want)
-    const listingChanged =
-      (currentListing?.basicInformation?.title ?? "") !== title ||
-      (currentListing?.basicInformation?.type ?? "") !== type ||
-      (currentListing?.basicInformation?.location?.address ?? "") !== address ||
-      (currentListing?.basicInformation?.location?.city ?? "") !== city ||
-      (currentListing?.basicInformation?.location?.state ?? "") !== state ||
-      (currentListing?.basicInformation?.location?.zipcode ?? "") !== zipcode ||
-      (currentListing?.media?.images?.[0] ?? "") !== primaryImage ||
-      normalizeModerationStatus(currentListing?.moderationStatus ?? currentListing?.tags?.status) !== moderationStatus;
 
     // Save auction details if changed
     const nextListingId = listingId.trim();
@@ -320,28 +505,179 @@ export function useAuctionDrawerController(
       incRaw !== "" && Number.isFinite(Number(incRaw)) && Number(incRaw) !== Number(auction.rules?.bidIncrement ?? 0);
 
     const listingIdChanged = nextListingId !== (auction.listingId ?? "");
-    const statusChanged = status !== auction.status;
-
+    const privacyChanged = isPrivate !== Boolean(auction.isPrivate);
     // 1) schedule
     if (scheduleChanged) {
       await handleScheduleSave();
     }
 
     // 2) auction details
-    if (listingIdChanged || bidChanged || incChanged || statusChanged) {
+    if (listingIdChanged || bidChanged || incChanged || privacyChanged) {
       await handleSaveDetails();
     }
 
-    // 3) listing fields
-    if (listingChanged) {
-      await handleSaveListing();
+    setSaveSucceeded(true);
+  }
+  async function handleListingModeration(nextStatus: ListingModerationStatus) {
+    if (!currentListing) return;
+
+    setListingSaving(true);
+    setAuctionError(null);
+    setSaveSucceeded(false);
+    try {
+      const updatedListing = await updateListingStatus(currentListing, nextStatus);
+      setModerationStatus(nextStatus);
+      setListing(updatedListing);
+
+      onUpdate({
+        ...row,
+        auction,
+        listing: updatedListing,
+        listingReview: row.listingReview
+          ? {
+              ...row.listingReview,
+              status: nextStatus,
+              request: row.listingReview.request
+                ? { ...row.listingReview.request, updatedAt: new Date().toISOString() }
+                : row.listingReview.request,
+            }
+          : row.listingReview,
+      });
+      setSaveSucceeded(true);
+    } catch (err) {
+      const message = getErrorMessage(err, "Failed to update listing review status");
+      setAuctionError(message);
+      throw new Error(message);
+    } finally {
+      setListingSaving(false);
+    }
+  }
+
+
+  function applyDraftReviewUpdate(
+    nextStatus: string,
+    request?: ListingReviewRequest,
+    nextListing?: IListing | null,
+  ) {
+    const updatedListing = nextListing ?? currentListing;
+    if (nextListing) {
+      setListing(nextListing);
+      syncListingFields(nextListing);
     }
 
-    setSaveSucceeded(true);
-    setTimeout(() => {
-      onClose?.();
-    }, 1500);
+    onUpdate({
+      ...row,
+      auction,
+      listing: updatedListing ?? row.listing,
+      listingReview: row.listingReview
+        ? {
+            ...row.listingReview,
+            status: nextStatus,
+            request: row.listingReview.request
+              ? {
+                  ...row.listingReview.request,
+                  status: request?.status ?? nextStatus,
+                  revision: request?.revision ?? row.listingReview.request.revision,
+                  updatedAt: request?.updatedAt ?? new Date().toISOString(),
+                  reviewedAt: request?.reviewedAt,
+                  reviewedBy: request?.reviewedBy,
+                  reviewReason: request?.generalMessage,
+                  generalMessage: request?.generalMessage,
+                  fieldIssues: request?.fieldIssues,
+                  data: request?.submittedSnapshot ?? row.listingReview.request.data,
+                  submittedSnapshot: request?.submittedSnapshot ?? row.listingReview.request.submittedSnapshot,
+                  adminEditedSnapshot: request?.adminEditedSnapshot,
+                  approvedSnapshot: request?.approvedSnapshot,
+                }
+              : row.listingReview.request,
+            history: request
+              ? [
+                  request as any,
+                  ...(row.listingReview.history ?? []).filter(
+                    (item: any) => item.reviewRequestId !== request.reviewRequestId,
+                  ),
+                ]
+              : row.listingReview.history,
+          }
+        : row.listingReview,
+    });
   }
+
+  async function runListingDraftAction(
+    action: () => Promise<ListingReviewRequest | ListingDraftReviewResult>,
+    fallback: string,
+    nextStatus: string,
+  ) {
+    setListingSaving(true);
+    setAuctionError(null);
+    setSaveSucceeded(false);
+    try {
+      const result = await action();
+      const request = "request" in result ? result.request : result;
+      const nextListing = "listing" in result ? result.listing : undefined;
+      applyDraftReviewUpdate(nextStatus, request, nextListing);
+      setSaveSucceeded(true);
+    } catch (err) {
+      const message = getErrorMessage(err, fallback);
+      setAuctionError(message);
+      throw new Error(message);
+    } finally {
+      setListingSaving(false);
+    }
+  }
+
+  async function handleApproveListingDraft() {
+    const reviewRequestId = row.listingReview?.request?.reviewRequestId ?? row.listingReview?.request?.draftId;
+    if (!reviewRequestId) return;
+    await runListingDraftAction(
+      () => approveListingDraft(reviewRequestId, row.listingReview?.request?.revision),
+      "Failed to approve listing draft",
+      "approved",
+    );
+  }
+
+  async function handleRequestListingDraftChanges() {
+    const reviewRequestId = row.listingReview?.request?.reviewRequestId ?? row.listingReview?.request?.draftId;
+    if (!reviewRequestId) return;
+    const reason = promptReason("Listing change request");
+    if (!reason) return;
+    await runListingDraftAction(
+      () => requestListingDraftChanges(reviewRequestId, reason, row.listingReview?.request?.revision),
+      "Failed to request listing changes",
+      "changes_requested",
+    );
+  }
+
+  async function handleRejectListingDraft() {
+    const reviewRequestId = row.listingReview?.request?.reviewRequestId ?? row.listingReview?.request?.draftId;
+    if (!reviewRequestId) return;
+    const reason = promptReason("Listing rejection");
+    if (!reason) return;
+    await runListingDraftAction(
+      () => rejectListingDraft(reviewRequestId, reason, row.listingReview?.request?.revision),
+      "Failed to reject listing draft",
+      "rejected",
+    );
+  }
+
+  async function handleSaveListingReviewEdit(input: {
+    adminEditedSnapshot?: any;
+    generalMessage?: string;
+    fieldIssues?: ListingReviewFieldIssue[];
+  }) {
+    const reviewRequestId = row.listingReview?.request?.reviewRequestId ?? row.listingReview?.request?.draftId;
+    if (!reviewRequestId) return;
+    await runListingDraftAction(
+      () =>
+        updateListingReviewRequest(reviewRequestId, {
+          expectedRevision: row.listingReview?.request?.revision,
+          ...input,
+        }),
+      "Failed to save review edits",
+      row.listingReview?.request?.status ?? "pending",
+    );
+  }
+
   async function handleSaveListing() {
     if (!currentListing) return;
 
@@ -352,9 +688,8 @@ export function useAuctionDrawerController(
         location: { address, city, state, zipcode },
       },
       media: {
-        images: primaryImage
-          ? [primaryImage, ...(currentListing.media?.images ?? []).filter((x) => x !== primaryImage)]
-          : (currentListing.media?.images ?? []),
+        ...(currentListing.media ?? { images: [] }),
+        thumbnailUrl: thumbnailUrl.trim(),
       },
       moderationStatus,
       tags: {
@@ -377,6 +712,16 @@ export function useAuctionDrawerController(
       setListingSaving(false);
     }
   }
+  function handleExternalListingUpdate(updatedListing: IListing) {
+    setListing(updatedListing);
+    syncListingFields(updatedListing);
+    onUpdate({
+      ...row,
+      auction,
+      listing: updatedListing,
+    });
+  }
+
   return {
     row: {
       ...row,
@@ -407,11 +752,17 @@ export function useAuctionDrawerController(
     setState,
     zipcode,
     setZipcode,
-    primaryImage,
-    setPrimaryImage,
+    thumbnailUrl,
+    setThumbnailUrl,
     moderationStatus,
     setModerationStatus,
     handleSaveListing,
+    handleExternalListingUpdate,
+    handleListingModeration,
+    handleApproveListingDraft,
+    handleRequestListingDraftChanges,
+    handleRejectListingDraft,
+    handleSaveListingReviewEdit,
 
     // details
     editingDetails,
@@ -422,8 +773,14 @@ export function useAuctionDrawerController(
     setStartingBid,
     increment,
     setIncrement,
+    auctionError,
     status,
     setStatus,
+    isPrivate,
+    setIsPrivate,
+    readiness,
+    readinessLoading,
+    readinessError,
 
     // actions
     loading,
@@ -431,8 +788,18 @@ export function useAuctionDrawerController(
     hasUnsavedChanges,
     handleCancelEdit,
     handleSaveDetails,
+    handleSubmit,
+    handleWithdraw,
+    handleApprove,
+    handleRequestChanges,
+    handleReject,
     handlePublish,
+    handlePause,
+    handleResume,
     handleEnd,
+    handleCancelAuction,
+    handleArchive,
+    handleRelist,
     handleDeleteClick,
 
     // bids panel props too
@@ -445,6 +812,15 @@ export function useAuctionDrawerController(
   };
 }
 
+function promptReason(label: string) {
+  return window.prompt(`${label} reason`)?.trim() ?? "";
+}
+
+function getErrorMessage(err: unknown, fallback: string) {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === "string" && err) return err;
+  return fallback;
+}
 function normalizeModerationStatus(status?: string): ListingModerationStatus {
   if (status === "pending" || status === "approved" || status === "denied" || status === "removed") {
     return status;

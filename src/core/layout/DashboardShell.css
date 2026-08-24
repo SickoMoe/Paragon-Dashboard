@@ -1,0 +1,110 @@
+
+.dashShell {
+  min-height: 100vh;
+  background: var(--dash-bg);
+  color: var(--dash-ink);
+}
+
+.dashShell__body {
+  width: min(1440px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.dashShell__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  position: relative;
+  min-height: 62px;
+}
+
+.dashShell__header::before {
+  content: "";
+  position: absolute;
+  left: -24px;
+  top: 3px;
+  width: 2px;
+  height: 58px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--dash-primary), rgba(44, 44, 44, 0));
+}
+
+.dashShell__title {
+  margin: 0;
+  color: var(--dash-ink);
+  font-size: clamp(38px, 3.3vw, 52px);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.dashShell__subtitle {
+  margin: 8px 0 0;
+  color: var(--dash-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.dashShell__action button,
+.dashShell__action a {
+  min-height: 38px;
+  border: 1px solid var(--dash-primary) !important;
+  border-radius: var(--dash-radius) !important;
+  background: var(--dash-primary) !important;
+  color: var(--dash-primary-fg) !important;
+  padding: 0 14px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  box-shadow: var(--dash-shadow-sm);
+}
+
+.dashActionGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 520px;
+}
+
+.dashShell__action .dashActionSecondary {
+  border-color: var(--dash-border) !important;
+  background: var(--dash-card) !important;
+  color: var(--dash-ink) !important;
+}
+
+.dashShell__action button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.dashActionMessage {
+  flex-basis: 100%;
+  color: var(--dash-muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+.dashShell__tabs {
+  margin-top: 14px;
+}
+
+.dashShell__toolbar {
+  margin-top: 12px;
+}
+
+.dashShell__content {
+  margin-top: 12px;
+}
+
+@media (max-width: 760px) {
+  .dashShell__body {
+    width: min(100% - 32px, 1440px);
+  }
+
+  .dashShell__header {
+    flex-direction: column;
+  }
+}

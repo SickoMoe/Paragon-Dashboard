@@ -20,6 +20,8 @@ type Props = {
 
   isPrivate: boolean;
   setIsPrivate: (v: boolean) => void;
+  authorizedAccountIds: string;
+  setAuthorizedAccountIds: (v: string) => void;
 
   readiness: AuctionDraftReadiness | null;
   readinessLoading: boolean;
@@ -46,6 +48,8 @@ export function AuctionEditPanel({
   setEndDate,
   isPrivate,
   setIsPrivate,
+  authorizedAccountIds,
+  setAuthorizedAccountIds,
   readiness,
   readinessLoading,
   readinessError,
@@ -114,6 +118,17 @@ export function AuctionEditPanel({
           </div>
           <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
         </div>
+
+        {isPrivate ? (
+          <Field label="Authorized account IDs">
+            <textarea
+              value={authorizedAccountIds}
+              onChange={(event) => setAuthorizedAccountIds(event.target.value)}
+              placeholder="One account ID per line"
+              style={{ ...inputStyle, minHeight: 76, resize: "vertical" }}
+            />
+          </Field>
+        ) : null}
 
         {error ? <div style={styles.error}>{error}</div> : null}
 

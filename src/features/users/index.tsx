@@ -6,6 +6,8 @@ import {
   type AccountStatus,
   type AccountType,
   type ManagedUser,
+  type IdentityVerificationStatus,
+  type PartnerSubtype,
   type SecurityRole,
   type UserFilters,
   type UserStats,
@@ -77,7 +79,7 @@ export default function UsersPage() {
         <label className="usersSearch"><span className="usersSrOnly">Search users</span><input value={filters.search} onChange={(event) => setFilter("search", event.target.value)} placeholder="Search name, email, company, or account ID" /></label>
         <div className="usersFilters">
           <Filter label="Role" value={filters.role} onChange={(value) => setFilter("role", value)} options={["all", "user", "admin"]} />
-          <Filter label="Account type" value={filters.accountType} onChange={(value) => setFilter("accountType", value)} options={["all", "bidder", "realtor", "partner"]} />
+          <Filter label="Account type" value={filters.accountType} onChange={(value) => setFilter("accountType", value)} options={["all", "bidder", "partner"]} />
           <Filter label="Bid access" value={filters.bidderStatus} onChange={(value) => setFilter("bidderStatus", value)} options={["all", "none", "pending", "approved", "rejected", "suspended"]} />
           <Filter label="Status" value={filters.accountStatus} onChange={(value) => setFilter("accountStatus", value)} options={["all", "active", "suspended"]} />
           <button className="usersButton usersButton--quiet" type="button" onClick={refresh}>Refresh</button>
@@ -92,7 +94,7 @@ export default function UsersPage() {
         {users.map((user) => (
           <button key={user.accountId} className="usersTable__row usersTable__row--body" type="button" onClick={() => setSelected(user)}>
             <span className="usersIdentity"><span className="usersAvatar">{user.username.slice(0, 1).toUpperCase()}</span><span><strong>{user.username}</strong><small>{user.email || user.accountId}</small></span></span>
-            <span><strong>{label(user.accountType)}</strong><small>{label(user.userType)} role</small></span>
+            <span><strong>{user.partnerSubtype ? `${label(user.accountType)} / ${label(user.partnerSubtype)}` : label(user.accountType)}</strong><small>{user.roles.map(label).join(", ")}</small></span>
             <span><StatusBadge status={user.bidderStatus === "none" ? "Not applied" : user.bidderStatus} kind={user.bidderStatus === "approved" ? "good" : user.bidderStatus === "pending" ? "warn" : user.bidderStatus === "rejected" || user.bidderStatus === "suspended" ? "danger" : "neutral"} /></span>
             <span><strong>{user.bidAuctionCount} auctions</strong><small>{user.bookmarkCount} saved</small></span>
             <span><StatusBadge status={user.accountStatus} kind={user.accountStatus === "active" ? "good" : "danger"} /></span>
@@ -120,6 +122,8 @@ function UserSkeleton() {
 function UserDrawer({ user, onClose, onChanged }: { user: ManagedUser | null; onClose: () => void; onChanged: () => void }) {
   const [role, setRole] = useState<SecurityRole>("user");
   const [accountType, setAccountType] = useState<AccountType>("bidder");
+  const [partnerSubtype, setPartnerSubtype] = useState<PartnerSubtype | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState<IdentityVerificationStatus>("under_review");
   const [accountStatus, setAccountStatus] = useState<AccountStatus>("active");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -127,7 +131,7 @@ function UserDrawer({ user, onClose, onChanged }: { user: ManagedUser | null; on
 
   useEffect(() => {
     if (!user) return;
-    setRole(user.userType); setAccountType(user.accountType); setAccountStatus(user.accountStatus); setNote(""); setError(null);
+    setRole(user.userType); setAccountType(user.accountType); setPartnerSubtype(user.partnerSubtype); setAccountStatus(user.accountStatus); setVerificationStatus(user.latestApplication?.verification?.status ?? "under_review"); setNote(""); setError(null);
   }, [user]);
 
   const run = async (task: () => Promise<unknown>) => {
@@ -150,17 +154,21 @@ function UserDrawer({ user, onClose, onChanged }: { user: ManagedUser | null; on
           <div className="userDrawer__sectionHead"><div><h3>Account access</h3><p>Security role and customer account classification.</p></div><StatusBadge status={user.accountStatus} kind={user.accountStatus === "active" ? "good" : "danger"} /></div>
           <div className="userDrawer__fields">
             <label><span>Security role</span><select value={role} onChange={(event) => setRole(event.target.value as SecurityRole)}><option value="user">User</option><option value="admin">Administrator</option></select></label>
-            <label><span>Account type</span><select value={accountType} onChange={(event) => setAccountType(event.target.value as AccountType)}><option value="bidder">Bidder</option><option value="realtor">Realtor</option><option value="partner">Partner</option></select></label>
+            <label><span>Account type</span><select value={accountType} onChange={(event) => setAccountType(event.target.value as AccountType)}><option value="bidder">Bidder</option><option value="partner">Partner</option></select></label>
+            {accountType === "partner" ? <label><span>Partner subtype</span><select value={partnerSubtype ?? ""} onChange={(event) => setPartnerSubtype((event.target.value || null) as PartnerSubtype | null)}><option value="">General partner</option><option value="realtor">Realtor</option></select></label> : null}
             <label><span>Account status</span><select value={accountStatus} onChange={(event) => setAccountStatus(event.target.value as AccountStatus)}><option value="active">Active</option><option value="suspended">Suspended</option></select></label>
           </div>
-          <button className="usersButton usersButton--solid" type="button" disabled={saving} onClick={() => run(() => userManagementApi.update(user.accountId, { userType: role, accountType, accountStatus }))}>Save account</button>
+          <button className="usersButton usersButton--solid" type="button" disabled={saving} onClick={() => run(() => userManagementApi.update(user.accountId, { userType: role, accountType, partnerSubtype: accountType === "partner" ? partnerSubtype : null, accountStatus }))}>Save account</button>
         </section>
         <section className="userDrawer__section">
           <div className="userDrawer__sectionHead"><div><h3>Bidder access</h3><p>Application review is separate from the account security role.</p></div><StatusBadge status={user.bidderStatus === "none" ? "Not applied" : user.bidderStatus} kind={user.bidderStatus === "approved" ? "good" : user.bidderStatus === "pending" ? "warn" : user.bidderStatus === "none" ? "neutral" : "danger"} /></div>
           {application ? <>
+            {application.identity ? <div className="userDrawer__application"><div><span>Legal name</span><strong>{application.identity.legalName}</strong></div><div><span>Date of birth</span><strong>{application.identity.dateOfBirth}</strong></div><div><span>Bidder email</span><strong>{application.identity.email}</strong></div><div><span>Bidder phone</span><strong>{application.identity.phone}</strong></div><div><span>ID verification</span><strong>{label(application.verification?.status?.replace(/_/g, " ") || "under review")}</strong></div><div><span>Document</span><strong>{application.verification?.maskedDocument || "Not recorded"}</strong></div></div> : null}
             <div className="userDrawer__application">{Object.entries(application.payload).filter(([key]) => key !== "certified").map(([key, value]) => <div key={key}><span>{label(key.replace(/([A-Z])/g, " $1"))}</span><strong>{String(value || "Not provided")}</strong></div>)}</div>
             <label className="userDrawer__note"><span>Decision note</span><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="Add context for the applicant and audit history" /></label>
+            <div className="userDrawer__fields"><label><span>ID verification state</span><select value={verificationStatus} onChange={(event) => setVerificationStatus(event.target.value as IdentityVerificationStatus)}><option value="verifying">Verifying</option><option value="needs_attention">Needs attention</option><option value="under_review">Under review</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></label></div>
             <div className="userDrawer__actions">
+              <button className="usersButton usersButton--quiet" type="button" disabled={saving || verificationStatus === application.verification?.status} onClick={() => run(() => userManagementApi.updateVerification(user, verificationStatus, note))}>Update verification</button>
               {canApprove ? <button className="usersButton usersButton--solid" type="button" disabled={saving} onClick={() => run(() => userManagementApi.decide(user, "approve", note))}>{application.status === "suspended" ? "Reinstate bidder" : "Approve application"}</button> : null}
               {canReject ? <button className="usersButton usersButton--danger" type="button" disabled={saving} onClick={() => run(() => userManagementApi.decide(user, "reject", note))}>Reject access</button> : null}
               {canSuspendBidder ? <button className="usersButton usersButton--quiet" type="button" disabled={saving} onClick={() => run(() => userManagementApi.decide(user, "suspend", note))}>Suspend bidding</button> : null}

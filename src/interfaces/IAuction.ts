@@ -88,6 +88,7 @@ export interface IAuction {
   endDate?: string;
 
   isPrivate: boolean;
+  authorizedAccountIds?: string[];
   status: AuctionStatus;
   lifecycle?: AuctionLifecycleState;
 

@@ -69,6 +69,41 @@ export function BidsPanel({
           <Metric label="Increment" value={money(leaderboard.incrementAmount)} />
         </section>
 
+        {leaderboard.monitoring ? (
+          <section style={styles.monitoring}>
+            <div style={styles.monitoringHeader}>
+              <strong style={styles.sectionTitle}>Auction access</strong>
+              <span style={styles.visibilityBadge}>{leaderboard.monitoring.visibility}</span>
+            </div>
+            {leaderboard.monitoring.visibility === "private" ? (
+              leaderboard.monitoring.authorizedUsers.length ? (
+                <div style={styles.monitoringList}>
+                  {leaderboard.monitoring.authorizedUsers.map((entry) => (
+                    <div key={entry.accountId} style={styles.monitoringRow}>
+                      <span><strong>{entry.username || entry.email || entry.accountId}</strong><small>{entry.verificationStatus?.replace(/_/g, " ") || "not verified"}</small></span>
+                      <span style={entry.biddingEligibility ? styles.eligible : styles.ineligible}>{entry.biddingEligibility ? "Eligible" : "Ineligible"}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <div style={styles.muted}>No users have been selected for this private auction.</div>
+            ) : <div style={styles.muted}>Anyone can discover this auction. Bidder eligibility is still enforced separately.</div>}
+            {leaderboard.monitoring.participants.length ? (
+              <>
+                <div style={styles.monitoringDivider} />
+                <div style={styles.muted}>Bidder verification and eligibility</div>
+                <div style={styles.monitoringList}>
+                  {leaderboard.monitoring.participants.map((entry) => (
+                    <div key={entry.bidderProfileId} style={styles.monitoringRow}>
+                      <span><strong>{entry.bidderProfileId}</strong><small>{entry.verificationStatus?.replace(/_/g, " ") || "legacy approval"}</small></span>
+                      <span style={entry.biddingEligibility ? styles.eligible : styles.ineligible}>{entry.biddingEligibility ? "Eligible" : "Ineligible"}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </section>
+        ) : null}
+
         <div style={styles.toolbar}>
           <div>
             <strong style={styles.sectionTitle}>Bid History</strong>
@@ -271,6 +306,53 @@ const styles: Record<string, CSSProperties> = {
   metric: {
     display: "grid",
     gap: 4,
+  },
+  monitoring: {
+    padding: 12,
+    border: "1px solid var(--dash-border)",
+    borderRadius: 8,
+    display: "grid",
+    gap: 10,
+    background: "var(--dash-surface)",
+  },
+  monitoringHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  visibilityBadge: {
+    padding: "3px 7px",
+    border: "1px solid var(--dash-border)",
+    borderRadius: 999,
+    color: "var(--dash-muted)",
+    fontSize: 10,
+    fontWeight: 750,
+    textTransform: "uppercase",
+  },
+  monitoringList: {
+    display: "grid",
+    gap: 7,
+  },
+  monitoringDivider: {
+    height: 1,
+    background: "var(--dash-border)",
+  },
+  monitoringRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  eligible: {
+    color: "#235b43",
+    fontSize: 11,
+    fontWeight: 750,
+  },
+  ineligible: {
+    color: "var(--dash-danger)",
+    fontSize: 11,
+    fontWeight: 750,
   },
   toolbar: {
     display: "flex",

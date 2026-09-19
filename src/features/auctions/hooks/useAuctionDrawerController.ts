@@ -41,6 +41,12 @@ import {
 } from "../../listingApi";
 import { AuctionOverview } from "../types";
 import { getListingThumbnailPath } from "../utils/listingMedia";
+
+function normalizeAccountIds(value: string | string[] | undefined) {
+  const ids = Array.isArray(value) ? value : String(value ?? "").split(/[\n,]/);
+  return Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+}
+
 export function useAuctionDrawerController(
   row: AuctionOverview,
   onUpdate: (updated: AuctionOverview) => void,
@@ -80,6 +86,9 @@ export function useAuctionDrawerController(
   );
   const [status, setStatus] = useState<IAuction["status"]>(auction.status);
   const [isPrivate, setIsPrivate] = useState<boolean>(Boolean(auction.isPrivate));
+  const [authorizedAccountIds, setAuthorizedAccountIds] = useState<string>(
+    (auction.authorizedAccountIds ?? []).join("\n"),
+  );
 
   const [listing, setListing] = useState<IListing | null>(row.listing ?? null);
   const [title, setTitle] = useState("");
@@ -119,6 +128,7 @@ export function useAuctionDrawerController(
     setIncrement(auction.rules?.bidIncrement != null ? String(auction.rules.bidIncrement) : "");
     setStatus(auction.status);
     setIsPrivate(Boolean(auction.isPrivate));
+    setAuthorizedAccountIds((auction.authorizedAccountIds ?? []).join("\n"));
 
     setListing(row.listing ?? null);
     syncListingFields(row.listing);
@@ -148,7 +158,10 @@ export function useAuctionDrawerController(
 
     const listingIdChanged = nextListingId !== (auction.listingId ?? "");
     const privacyChanged = isPrivate !== Boolean(auction.isPrivate);
-    return scheduleChanged || bidChanged || incChanged || listingIdChanged || privacyChanged;
+    const authorizationChanged =
+      normalizeAccountIds(authorizedAccountIds).join("|") !==
+      normalizeAccountIds(auction.authorizedAccountIds).join("|");
+    return scheduleChanged || bidChanged || incChanged || listingIdChanged || privacyChanged || authorizationChanged;
   }, [
     auction.startDate,
     auction.endDate,
@@ -156,12 +169,14 @@ export function useAuctionDrawerController(
     auction.rules?.bidIncrement,
     auction.listingId,
     auction.isPrivate,
+    auction.authorizedAccountIds,
     startDate,
     endDate,
     listingId,
     startingBid,
     increment,
     isPrivate,
+    authorizedAccountIds,
   ]);
 
   useEffect(() => {
@@ -285,6 +300,7 @@ export function useAuctionDrawerController(
       startDate: startDate ? new Date(startDate).toISOString() : base.startDate,
       endDate: endDate ? new Date(endDate).toISOString() : base.endDate,
       isPrivate,
+      authorizedAccountIds: isPrivate ? normalizeAccountIds(authorizedAccountIds) : [],
       status: "draft" as const,
     };
   }
@@ -448,6 +464,13 @@ export function useAuctionDrawerController(
     if (isPrivate !== Boolean(auction.isPrivate)) {
       patch.isPrivate = isPrivate;
     }
+    const nextAuthorizedAccountIds = isPrivate ? normalizeAccountIds(authorizedAccountIds) : [];
+    if (
+      nextAuthorizedAccountIds.join("|") !==
+      normalizeAccountIds(auction.authorizedAccountIds).join("|")
+    ) {
+      patch.authorizedAccountIds = nextAuthorizedAccountIds;
+    }
 
     if (Object.keys(patch).length === 0) {
       setEditingDetails(false);
@@ -506,13 +529,16 @@ export function useAuctionDrawerController(
 
     const listingIdChanged = nextListingId !== (auction.listingId ?? "");
     const privacyChanged = isPrivate !== Boolean(auction.isPrivate);
+    const authorizationChanged =
+      normalizeAccountIds(authorizedAccountIds).join("|") !==
+      normalizeAccountIds(auction.authorizedAccountIds).join("|");
     // 1) schedule
     if (scheduleChanged) {
       await handleScheduleSave();
     }
 
     // 2) auction details
-    if (listingIdChanged || bidChanged || incChanged || privacyChanged) {
+    if (listingIdChanged || bidChanged || incChanged || privacyChanged || authorizationChanged) {
       await handleSaveDetails();
     }
 
@@ -778,6 +804,8 @@ export function useAuctionDrawerController(
     setStatus,
     isPrivate,
     setIsPrivate,
+    authorizedAccountIds,
+    setAuthorizedAccountIds,
     readiness,
     readinessLoading,
     readinessError,

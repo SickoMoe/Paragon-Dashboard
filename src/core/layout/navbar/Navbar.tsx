@@ -17,6 +17,7 @@ const mainLinks: NavItem[] = [
   { to: "/auctions", label: "Auctions" },
   { to: "/messages", label: "Messages" },
   { to: "/users", label: "Users" },
+  { to: "/website", label: "Website" },
 ];
 
 export default function NavBar({ isAuthed = false, onLogout }: Props) {

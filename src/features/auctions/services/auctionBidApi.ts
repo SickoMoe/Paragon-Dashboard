@@ -24,6 +24,25 @@ export type AuctionLeaderboardDTO = {
   reserveMet?: boolean;
   bids: BidDTO[];
   voidedBids?: BidDTO[];
+  monitoring?: {
+    visibility: "public" | "private";
+    authorizedUsers: Array<{
+      accountId: string;
+      username?: string;
+      email?: string;
+      bidderStatus: string;
+      verificationStatus?: string;
+      biddingEligibility: boolean;
+    }>;
+    participants: Array<{
+      bidderProfileId: string;
+      accountId?: string;
+      bidderStatus: string;
+      verificationStatus?: string;
+      biddingEligibility: boolean;
+      restriction?: string;
+    }>;
+  };
 };
 
 export function fetchAuctionBids(

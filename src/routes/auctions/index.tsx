@@ -160,6 +160,8 @@ function AuctionsPageContent() {
               startDate: toISO(input.startDate),
               endDate: toISO(input.endDate),
               status: input.status,
+              isPrivate: input.isPrivate,
+              authorizedAccountIds: input.isPrivate ? input.authorizedAccountIds : [],
             });
 
             handleCreated({

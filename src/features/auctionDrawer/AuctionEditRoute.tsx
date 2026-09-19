@@ -61,6 +61,8 @@ function AuctionEditRouteContent({
         setEndDate={ctrl.setEndDate}
         isPrivate={ctrl.isPrivate}
         setIsPrivate={ctrl.setIsPrivate}
+        authorizedAccountIds={ctrl.authorizedAccountIds}
+        setAuthorizedAccountIds={ctrl.setAuthorizedAccountIds}
         readiness={ctrl.readiness}
         readinessLoading={ctrl.readinessLoading}
         readinessError={ctrl.readinessError}

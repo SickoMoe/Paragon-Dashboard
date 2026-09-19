@@ -9,6 +9,7 @@ export type AuctionPatch = Partial<{
   listingId: string;
   startingBid: number;
   isPrivate: boolean;
+  authorizedAccountIds: string[];
   rules: Partial<AuctionRules>;
   startDate: string;
   endDate: string;
@@ -25,6 +26,7 @@ export type AuctionDraftPayload = {
   startDate?: string;
   endDate?: string;
   isPrivate?: boolean;
+  authorizedAccountIds?: string[];
   status?: "draft" | "scheduled";
   approvalReason?: string;
 };
@@ -53,6 +55,7 @@ export type AuctionCreateInput = {
   endDate?: string;
   status?: IAuction["status"];
   isPrivate?: boolean;
+  authorizedAccountIds?: string[];
 };
 
 export function patchAuction(id: string, patch: AuctionPatch): Promise<IAuction> {

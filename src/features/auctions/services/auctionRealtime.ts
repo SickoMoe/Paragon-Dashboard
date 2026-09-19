@@ -43,6 +43,10 @@ export function subscribeToAuctionRealtime(onEvent: AuctionRealtimeHandler) {
 
     socket.addEventListener("open", () => {
       attempts = 0;
+      socket?.send(JSON.stringify({
+        type: "authenticate",
+        devAdmin: appEnv.devAdminHeadersEnabled,
+      }));
       socket?.send(JSON.stringify({ type: "subscribe.auctions", auctionIds: [] }));
     });
 

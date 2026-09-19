@@ -208,6 +208,7 @@ export type CreateAuctionInput = {
   startDate?: string;
   endDate?: string;
   isPrivate: boolean;
+  authorizedAccountIds: string[];
   status: "draft" | "scheduled";
 };
 
@@ -224,6 +225,7 @@ export function CreateAuctionForm({
     bidIncrement: 1000,
     currency: "USD",
     isPrivate: false,
+    authorizedAccountIds: [],
     status: "draft",
   });
   const [listingMode, setListingMode] = useState<"existing" | "new">(
@@ -415,6 +417,19 @@ export function CreateAuctionForm({
           />
           Private auction
         </label>
+        {form.isPrivate ? (
+          <Field label="Authorized account IDs">
+            <textarea
+              style={{ ...inputStyle, minHeight: 76, resize: "vertical" }}
+              value={form.authorizedAccountIds.join("\n")}
+              placeholder="One account ID per line"
+              onChange={(event) => update(
+                "authorizedAccountIds",
+                event.target.value.split(/[\n,]/).map((id) => id.trim()).filter(Boolean),
+              )}
+            />
+          </Field>
+        ) : null}
       </Section>
 
       {/* Status */}

@@ -1,3 +1,4 @@
+import LiquidationReview from "../../features/liquidation/LiquidationReview";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Drawer from "../../core/components/Drawer";
@@ -310,6 +311,8 @@ export default function ListingReviewDrawer({
           {selectedReview?.reviewRequest?.generalMessage ? (
             <Detail label="Review note" value={selectedReview.reviewRequest.generalMessage} />
           ) : null}
+
+          <LiquidationReview key={conversation.listingId} listingId={conversation.listingId} />
 
           {payloadEntries.length ? (
             <div style={{ marginTop: 16 }}>

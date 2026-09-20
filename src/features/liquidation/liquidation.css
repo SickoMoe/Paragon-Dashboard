@@ -1,0 +1,9 @@
+.liquidationReview { border-top: 1px solid var(--dash-line); margin: 20px 0; padding: 16px 0; font-size: 13px; line-height: 1.5; }
+.liquidationReview fieldset { display: grid; gap: 10px; border: 1px solid var(--dash-line); padding: 12px; margin: 12px 0; border-radius: 8px; min-width: 0; }
+.liquidationReview label { display: grid; gap: 4px; }
+.liquidationReview .liquidationReview__check { display: flex; gap: 8px; align-items: center; }
+.liquidationReview select, .liquidationReview textarea { padding: 8px; border: 1px solid var(--dash-line); border-radius: 6px; background: var(--dash-surface); color: var(--dash-ink); max-width: 100%; }
+.liquidationReview button { padding: 7px 10px; cursor: pointer; }
+.liquidationReview__actions, .liquidationReview__summary { display: flex; flex-wrap: wrap; gap: 8px; }
+.liquidationReview dl { overflow-wrap: anywhere; }
+.liquidationReview dd { margin: 0 0 8px; font-weight: 600; }

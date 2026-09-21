@@ -189,21 +189,27 @@ export function useAuctionDrawerController(
     }
 
     let cancelled = false;
+    let sequence = 0;
     setReadinessLoading(true);
     setReadinessError(null);
-    fetchAuctionDraftReadiness(draftId)
-      .then((next) => {
-        if (!cancelled) setReadiness(next);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setReadinessError(getErrorMessage(err, "Failed to load draft readiness"));
-      })
-      .finally(() => {
-        if (!cancelled) setReadinessLoading(false);
-      });
-
+    const refresh = async () => {
+      const current = ++sequence;
+      try {
+        const next = await fetchAuctionDraftReadiness(draftId);
+        if (!cancelled && current === sequence) { setReadiness(next); setReadinessError(null); }
+      } catch (err) {
+        if (!cancelled && current === sequence) setReadinessError(getErrorMessage(err, "Failed to load draft readiness"));
+      } finally {
+        if (!cancelled && current === sequence) setReadinessLoading(false);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(refresh, 15000);
+    window.addEventListener('focus', refresh);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
     };
   }, [row.auctionDraft?.id, row.auctionDraft?.updatedAt]);
 

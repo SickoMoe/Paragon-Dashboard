@@ -1,5 +1,5 @@
 // routes/auctions/AuctionOverviewRoute.tsx
-import { useNavigate, useParams, useRevalidator } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useRevalidator } from "react-router-dom";
 import { useDashboardPageContext } from "../../routes/auctions/auctionPageContext";
 import { AuctionOverviewPanel } from "./AuctionOverviewPanel";
 import { useAuctionDrawerController } from "../auctions/hooks/useAuctionDrawerController";
@@ -13,6 +13,7 @@ export default function AuctionOverviewRoute() {
 
   const row = auctions.find((a) => a.auction.id === auctionId);
   if (!row) return null;
+  if (row.auctionDraft || ["draft", "pending_approval", "changes_requested", "scheduled"].includes(row.auction.status)) return <Navigate to={`/auctions/${auctionId}/edit`} replace />;
 
   return (
     <AuctionOverviewRouteContent

@@ -68,6 +68,7 @@ export default function Drawer(props: {
     top: 12,
     bottom: 12,
     width,
+    maxWidth: "100vw",
     background: "var(--dash-card)",
     boxShadow:
       side === "right"

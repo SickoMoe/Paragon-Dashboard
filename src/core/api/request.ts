@@ -18,11 +18,13 @@ export async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     let msg = "";
+    let details: unknown;
     try {
       const j = await res.json();
+      details = j;
       msg = j?.error || j?.message || "";
     } catch {}
-    throw new Error(msg || `Request failed: ${res.status}`);
+    throw Object.assign(new Error(msg || `Request failed: ${res.status}`), { status: res.status, details });
   }
 
   if (res.status === 204) return undefined as T;

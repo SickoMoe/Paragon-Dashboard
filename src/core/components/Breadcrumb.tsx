@@ -36,7 +36,7 @@ export function AuctionDrawerBreadcrumb({
         {mode === "edit" && (
           <>
             <span style={styles.sep}>/</span>
-            <span style={styles.current}>Edit</span>
+            <span style={styles.current}>Preparation</span>
           </>
         )}
       </div>

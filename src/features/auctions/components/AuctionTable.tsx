@@ -1,3 +1,4 @@
+import { preparationStatus } from "../../auctionPreparation/preparation";
 import type { IAuction } from "../../../interfaces/IAuction";
 import { AuctionOverview } from "../types";
 import { getListingThumbnail } from "../utils/listingMedia";
@@ -43,11 +44,11 @@ function TableRow({ row, onClick }: { row: AuctionOverview; onClick: () => void 
   const img = getListingThumbnail(l);
 
   return (
-    <div className="adminTable__row adminTable__row--body" onClick={onClick} role="button" tabIndex={0}>
+    <div className="adminTable__row adminTable__row--body" onClick={onClick} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }} role="button" tabIndex={0}>
       {/* Status */}
       <div className="adminTable__statusCell">
         <StatusDot status={a.status} />
-        <span className="adminTable__muted">{a.status}</span>
+        <span className="adminTable__muted">{preparationStatus(row)}</span>
       </div>
 
       {/* Property */}
@@ -59,7 +60,7 @@ function TableRow({ row, onClick }: { row: AuctionOverview; onClick: () => void 
             {loc.address}, {loc.city}, {loc.state} {loc.zipcode}
           </div>
         <div className="adminTable__muted">
-          {row.auctionDraft ? "Auction draft" : `Auction: ${a.id}`}
+          {row.auctionDraft ? "Preparation" : `Auction: ${a.id}`}
         </div>
         </div>
       </div>

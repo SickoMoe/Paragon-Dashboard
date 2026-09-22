@@ -65,19 +65,6 @@ export function fetchManagedListings(): Promise<IListing[]> {
   return request<IListing[]>(`${BASE_URL}/listings/manage`);
 }
 
-export function placeMissingListingsNear(input: {
-  latitude: number;
-  longitude: number;
-  radiusKm?: number;
-}): Promise<{ updatedCount: number; listings: IListing[] }> {
-  return request<{ updatedCount: number; listings: IListing[] }>(
-    `${BASE_URL}/listings/manage/geolocate-missing`,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-}
 
 export function createListing(input: CreateListingInput): Promise<IListing> {
   return request<IListing>(`${BASE_URL}/listings`, {

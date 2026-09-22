@@ -73,6 +73,7 @@ export type ListingReview = {
 };
 
 export type AuctionOverview = {
+  preparationReadiness?: import("../auctionPreparation/preparation").Readiness;
   auction: IAuction;
   listing: IListing;
   auctionDraft?: {

@@ -42,6 +42,7 @@ export type AuctionDraftRecord = {
 };
 
 export type AuctionDraftReadiness = {
+  checks?: import("../../auctionPreparation/preparation").Check[];
   ready: boolean;
   missingFields: string[];
   validationErrors: Array<{ field: string; message: string }>;

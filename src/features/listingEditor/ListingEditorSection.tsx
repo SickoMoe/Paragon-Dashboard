@@ -12,7 +12,11 @@ import {
 export function ListingEditorSection({
   listing,
   onUpdated,
+  allowPublish = true,
+  onDirtyChange,
 }: {
+  allowPublish?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
   listing: IListing;
   onUpdated: (listing: IListing) => void;
 }) {
@@ -27,6 +31,8 @@ export function ListingEditorSection({
   }, [initialForm]);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
+
+  useEffect(() => { onDirtyChange?.(dirty); return () => onDirtyChange?.(false); }, [dirty, onDirtyChange]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -111,7 +117,7 @@ export function ListingEditorSection({
         >
           {saving === "save" ? "Saving..." : "Save Listing"}
         </button>
-        <button
+        {allowPublish ? <button
           type="button"
           style={primaryBtn}
           onClick={() => void save(true)}
@@ -122,7 +128,7 @@ export function ListingEditorSection({
             : listing.workflowStatus === "published"
               ? "Publish Updates"
               : "Save & Publish"}
-        </button>
+        </button> : null}
       </div>
     </section>
   );

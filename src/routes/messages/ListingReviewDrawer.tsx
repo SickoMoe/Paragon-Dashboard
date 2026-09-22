@@ -180,6 +180,7 @@ export default function ListingReviewDrawer({
   onUpdated?: () => void;
 }) {
   const navigate = useNavigate();
+  const [approvedResult, setApprovedResult] = useState<{ listingId: string; reviewId: string; draft: { id: string; auctionId?: string } } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -214,7 +215,8 @@ export default function ListingReviewDrawer({
     listing?.basicInformation?.location ?? payload?.basicInformation?.location ?? {};
   const fieldIssues =
     actionable?.fieldIssues ?? selectedReview?.reviewRequest?.fieldIssues ?? [];
-  const auctionDraft = conversation?.currentAuctionDraft ?? selectedReview?.auctionDraft ?? null;
+  const justApprovedDraft = approvedResult?.listingId === conversation?.listingId ? approvedResult?.draft : null;
+  const auctionDraft = (justApprovedDraft && conversation?.currentAuctionDraft?.id !== justApprovedDraft.id ? justApprovedDraft : conversation?.currentAuctionDraft) ?? justApprovedDraft ?? selectedReview?.auctionDraft ?? null;
 
   const payloadEntries = useMemo(
     () =>
@@ -254,11 +256,12 @@ export default function ListingReviewDrawer({
         );
       }
 
-      await request(`/api/drafts/listings/${actionable.reviewRequestId}/${kind}`, {
+      const result = await request<{ auctionDraft?: { id: string; auctionId?: string } }>(`/api/drafts/listings/${actionable.reviewRequestId}/${kind}`, {
         method: "POST",
         body: JSON.stringify(body),
       });
 
+      if (kind === "approve" && result.auctionDraft && conversation) setApprovedResult({ listingId: conversation.listingId, reviewId: actionable.reviewRequestId, draft: result.auctionDraft });
       setNote("");
       onUpdated?.();
     } catch (e: any) {
@@ -268,7 +271,7 @@ export default function ListingReviewDrawer({
     }
   }
 
-  const hasActionableReview = actionable?.status === "pending";
+  const hasActionableReview = actionable?.status === "pending" && approvedResult?.reviewId !== actionable.reviewRequestId;
 
   return (
     <Drawer open={open} onClose={onClose} title="Listing Conversation" size={620} zIndex={70}>
@@ -282,11 +285,12 @@ export default function ListingReviewDrawer({
               {hasActionableReview
                 ? "Awaiting admin decision"
                 : auctionDraft
-                  ? "Auction draft ready"
+                  ? "Listing approved · prepare the auction"
                   : "No active review controls"}
             </div>
           </div>
 
+          {approvedResult?.listingId === conversation.listingId ? <p role="status">Listing approved. Continue with Prepare Auction below.</p> : null}
           {error ? <div style={{ color: "var(--dash-danger)", marginBottom: 12 }}>{error}</div> : null}
 
           <Detail label="Listing" value={title} />
@@ -418,7 +422,7 @@ export default function ListingReviewDrawer({
                 }
                 style={buttonStyle("solid", false)}
               >
-                {auctionDraft.auctionId ? "Open Auction" : "Open Auction Draft"}
+                {auctionDraft.auctionId ? "Open Auction" : "Prepare Auction"}
               </button>
             ) : null}
           </div>

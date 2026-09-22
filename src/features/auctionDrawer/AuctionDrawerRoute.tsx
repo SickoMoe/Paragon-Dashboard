@@ -48,13 +48,13 @@ export default function AuctionDrawerRoute() {
   if (!row) return null;
 
   return (
-    <AuctionDrawer onClose={handleClose} size={isEdit ? 640 : 460}>
+    <AuctionDrawer onClose={handleClose} size={isEdit ? 880 : 460}>
       <AuctionDrawerCloseGuardContext.Provider value={contextValue}>
         <AuctionDrawerBreadcrumb
-          auctionId={row.auction.id}
+          auctionId={row.listing.basicInformation.title || "Property"}
           mode={isEdit ? "edit" : "overview"}
           onGoAuctions={handleClose}
-          onGoOverview={() => navigate(`/auctions/${row.auction.id}`)}
+          onGoOverview={() => { if (!closeGuard || closeGuard()) navigate(`/auctions/${row.auction.id}`); }}
           onClose={handleClose}
         />
         <Outlet />

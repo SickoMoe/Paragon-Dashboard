@@ -17,7 +17,6 @@ import { CreateAuctionModal } from "../../features/auctionCreate/CreateAuctionDr
 import { createAuction } from "../../features/auctions/services/auctionDashboardApi";
 import {
   createListing as createPropertyListing,
-  placeMissingListingsNear,
 } from "../../features/listingApi";
 
 const toISO = (v?: string) => (v ? new Date(v).toISOString() : undefined);
@@ -34,10 +33,6 @@ export default function AuctionsPage() {
 
 function AuctionsPageContent() {
   const [creating, setCreating] = useState(false);
-  const [placingCoordinates, setPlacingCoordinates] = useState(false);
-  const [coordinateMessage, setCoordinateMessage] = useState<string | null>(
-    null,
-  );
   const navigate = useNavigate();
   const {
     auctions,
@@ -57,49 +52,6 @@ function AuctionsPageContent() {
     { all: auctions.length } as AuctionCounts,
   );
 
-  const handlePlaceNearMe = () => {
-    if (!navigator.geolocation) {
-      setCoordinateMessage("Location is not supported by this browser.");
-      return;
-    }
-
-    setPlacingCoordinates(true);
-    setCoordinateMessage("Finding your location...");
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        void placeMissingListingsNear({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          radiusKm: 8,
-        })
-          .then(({ updatedCount }) => {
-            setCoordinateMessage(
-              updatedCount
-                ? `${updatedCount} listings placed near you.`
-                : "Every listing already has coordinates.",
-            );
-          })
-          .catch((error) => {
-            setCoordinateMessage(
-              error instanceof Error
-                ? error.message
-                : "Unable to place listings.",
-            );
-          })
-          .finally(() => setPlacingCoordinates(false));
-      },
-      (error) => {
-        setCoordinateMessage(
-          error.code === error.PERMISSION_DENIED
-            ? "Location access was not allowed."
-            : "Your location could not be determined.",
-        );
-        setPlacingCoordinates(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
-    );
-  };
-
   return (
     <>
       <DashboardFrame
@@ -109,23 +61,7 @@ function AuctionsPageContent() {
         toolbar={<AuctionsToolbar search={search} onSearch={setSearch} />}
         action={
           <div className="dashActionGroup">
-            <button
-              type="button"
-              className="dashActionSecondary"
-              onClick={handlePlaceNearMe}
-              disabled={placingCoordinates}
-              title="Use your current location to place listings without coordinates"
-            >
-              {placingCoordinates ? "Locating..." : "Place entries near me"}
-            </button>
-            <button type="button" onClick={() => setCreating(true)}>
-              + New
-            </button>
-            {coordinateMessage ? (
-              <span className="dashActionMessage" role="status">
-                {coordinateMessage}
-              </span>
-            ) : null}
+            <button type="button" className="dashActionSecondary" onClick={() => setCreating(true)}>Create auction manually</button>
           </div>
         }
       />
@@ -133,7 +69,7 @@ function AuctionsPageContent() {
       <AuctionsTable
         rows={filteredAuctions}
         onRowClick={(row) => {
-          if (row.auctionDraft) {
+          if (row.auctionDraft || ["draft", "pending_approval", "changes_requested", "scheduled"].includes(row.auction.status)) {
             navigate(`/auctions/${row.auction.id}/edit`);
             return;
           }

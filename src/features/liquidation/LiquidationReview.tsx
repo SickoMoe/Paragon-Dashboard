@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { request } from '../../core/api/request';
 import { appEnv } from '../../core/config/env';
 import { categories, relationships, label, type Authority, type Liquidation, type Document } from './types';
 import './liquidation.css';
-export default function LiquidationReview({ listingId }: { listingId: string }) {
+export default function LiquidationReview({ listingId, embedded = false, onUpdated }: { listingId: string; embedded?: boolean; onUpdated?: (value: Liquidation) => void }) {
+  const updated = useRef(onUpdated); updated.current = onUpdated;
   const [data, setData] = useState<Liquidation | null>(null);
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const [correcting, setCorrecting] = useState(false);
@@ -11,7 +12,7 @@ export default function LiquidationReview({ listingId }: { listingId: string }) 
   const [notice, setNotice] = useState('');
   const [note, setNote] = useState(''); const [requirements, setRequirements] = useState<string[]>([]); const [requirementsNote, setRequirementsNote] = useState('');
   const base = `/api/listings/${encodeURIComponent(listingId)}/liquidation`;
-  function apply(value: Liquidation) { setData(value); setRequirements(value.requiredDocuments); setRequirementsNote(value.requirementsNote); }
+  function apply(value: Liquidation) { updated.current?.(value); setData(value); setRequirements(value.requiredDocuments); setRequirementsNote(value.requirementsNote); }
   async function refresh() { try { apply(await request<Liquidation>(base)); setError(''); } catch(e) { setError((e as Error).message); } }
   useEffect(() => { let active = true; setData(null); request<Liquidation>(base).then(value => { if(active) { apply(value); setError(''); } }).catch(e => { if(active) setError(e.message); }); return () => { active = false; }; }, [base]);
   async function action(path: string, method: string, body: object) { setBusy(true); setError(''); setNotice(''); try { apply(await request<Liquidation>(base + path, { method, body: JSON.stringify({ ...body, revision: data?.revision }) })); setNotice('Saved. Readiness has been updated.'); if(path === '/authority') setCorrecting(false); } catch(e) { setError((e as Error).message); } finally { setBusy(false); } }
@@ -25,11 +26,13 @@ export default function LiquidationReview({ listingId }: { listingId: string }) 
     } catch(e) { setError((e as Error).message); } finally { setDownloading(''); }
   }
   if (!data || data.listingId !== listingId) return <p>{error || 'Loading authority and documents…'} {error ? <button onClick={refresh}>Retry</button> : null}</p>;
-  return <section className="liquidationReview"><h3>Authority & document review</h3><p>Separate from approval of the listing snapshot.</p>
+  return <section className="liquidationReview">{!embedded ? <><h3>Authority & document review</h3><p>Verify the seller and review the property documents.</p></> : null}
     {error ? <p role="alert">{error}</p> : null}{notice ? <p role="status">{notice}</p> : null}<button onClick={refresh} disabled={busy}>Refresh readiness</button>
+    {!embedded ? <>
     <div className="liquidationReview__summary"><span>Listing: {label(data.listingReviewStatus)}</span><span>Authority: {label(data.authority.status)}</span><span>Documents: {data.readiness.documentsReady ? 'Satisfied' : 'Needs attention'}</span><span>Auction: {label(data.auctionStatus)}</span></div>
     <div className="liquidationReview__readiness"><h4>{data.readiness.ready ? 'Ready for auction' : 'Before this property can reach auction'}</h4>{data.readiness.ready ? <p>All prerequisites are satisfied.</p> : <ul>{data.readiness.blockers.map(blocker => <li key={blocker.code}>{blocker.label}</li>)}</ul>}</div>
-    <h4>Seller authority</h4>{data.authorityLockReason ? <p className="liquidationReview__notice">{data.authorityLockReason}</p> : null}<dl>{(['relationship','legalName','representativeName','contact','brokerage','notes','reviewNote','correctionReason'] as const).map(key => <div key={key}><dt>{label(key.replace(/([a-z])([A-Z])/g,'$1 $2'))}</dt><dd>{key === 'relationship' ? label(data.authority[key]) : data.authority[key] || '—'}</dd></div>)}</dl>
+    </> : null}
+    <h4>Seller authority · {label(data.authority.status)}</h4>{data.authorityLockReason ? <p className="liquidationReview__notice">{data.authorityLockReason}</p> : null}<dl>{(['relationship','legalName','representativeName','contact','brokerage','notes','reviewNote','correctionReason'] as const).map(key => <div key={key}><dt>{label(key.replace(/([a-z])([A-Z])/g,'$1 $2'))}</dt><dd>{key === 'relationship' ? label(data.authority[key]) : data.authority[key] || '—'}</dd></div>)}</dl>
     <button disabled={busy} onClick={() => setCorrecting(value => !value)}>{correcting ? 'Cancel correction' : 'Correct authority information'}</button>
     {correcting ? <AuthorityCorrection key={data.revision} authority={data.authority} busy={busy} save={body => action('/authority', 'PUT', body)} /> : null}
     <fieldset disabled={busy || data.authority.status === 'not_submitted'}><label>Authority review note<textarea maxLength={2000} value={note} onChange={e => setNote(e.target.value)} /></label><div className="liquidationReview__actions">{['verified','rejected','needs_information'].map(status => <button key={status} disabled={status !== 'verified' && !note.trim()} onClick={() => action('/authority/review','PATCH',{ status, reviewNote: note })}>{({ verified: 'Verify authority', rejected: 'Reject authority', needs_information: 'Request information' } as Record<string, string>)[status]}</button>)}</div></fieldset>

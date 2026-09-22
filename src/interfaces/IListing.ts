@@ -1,6 +1,8 @@
 // src/domain/entities/IListing.ts
 
 export interface IListing {
+  revision?: number;
+  reviewState?: { approvedReviewRequestId?: string; hasNewerMaterialChanges?: boolean };
   ownerAccountId: string;
   listingId: string;
   moderationStatus?: "pending" | "approved" | "denied" | "removed";

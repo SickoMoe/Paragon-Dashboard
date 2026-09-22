@@ -3,15 +3,9 @@ import { AuctionOverview } from "../auctions/types";
 import { IAuction } from "../../interfaces/IAuction";
 import { inputStyle, primaryBtn, secondaryBtn } from "../auctionDrawer/styles";
 import { IListing } from "../../interfaces/IListing";
-import {
-  createBlankListingForm,
-  ListingFormFields,
-  listingFormToCreateInput,
-} from "../listingEditor/ListingFormFields";
-import {
-  fetchManagedListings,
-  type CreateListingInput,
-} from "../listingApi";
+import { ListingEditorSection } from "../listingEditor/ListingEditorSection";
+import ListingCreation from "../listingEditor/ListingCreation";
+import { fetchManagedListings, type CreateListingInput } from "../listingApi";
 let tempCounter = 0;
 
 export function makeTempId() {
@@ -27,7 +21,7 @@ export function createOptimisticDraft(
     startDate?: string;
     endDate?: string;
   },
-  listing: IListing
+  listing: IListing,
 ): AuctionOverview {
   const tempId = `draft-${Date.now()}`;
 
@@ -75,7 +69,8 @@ const overlay: React.CSSProperties = {
 const modal: React.CSSProperties = {
   background: "var(--dash-card)",
   borderRadius: 12,
-  width: "100%",
+  width: "calc(100vw - 32px)",
+  boxSizing: "border-box",
   maxWidth: 820,
   maxHeight: "90vh",
   overflowY: "auto",
@@ -124,42 +119,65 @@ const closeBtn: React.CSSProperties = {
   lineHeight: 1,
 };
 
-
 export function CreateAuctionModal({
   onClose,
   onSubmit,
+  initialMode = "existing",
 }: {
+  initialMode?: "existing" | "new";
   onClose: () => void;
-onSubmit: (input: CreateAuctionInput) => void | Promise<void>}) {
+  onSubmit: (input: CreateAuctionInput) => void | Promise<void>;
+}) {
+  const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(false);
+  const close = () => {
+    if (
+      !loading &&
+      (!dirty || window.confirm("Discard unsaved changes? Saved property drafts will be kept."))
+    )
+      onClose();
+  };
   const [error, setError] = useState<string | null>(null);
-async function handleSubmit(input: CreateAuctionInput) {
-  setLoading(true);
-  setError(null);
+  async function handleSubmit(input: CreateAuctionInput) {
+    setLoading(true);
+    setError(null);
 
-  try {
-    await onSubmit(input);
-    onClose();
-  } catch (err) {
-    setError(err instanceof Error ? err.message : "Failed to create auction");
-  } finally {
-    setLoading(false);
+    try {
+      await onSubmit(input);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create auction");
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
   return (
     <div style={overlay}>
-      <div style={modal}>
+      <div
+        style={modal}
+        role="dialog"
+        aria-modal="true"
+        aria-label={initialMode === "new" ? "Create property" : "Create auction"}
+      >
         <header style={header}>
-          <h3 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>Create Auction</h3>
-          <button onClick={onClose} style={closeBtn}>×</button>
+          <h3 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>
+            {initialMode === "new" ? "Create property" : "Create auction"}
+          </h3>
+          <button onClick={close} disabled={loading} aria-label="Close creation" style={closeBtn}>
+            ×
+          </button>
         </header>
 
         {error && <div style={{ color: "var(--dash-danger)" }}>{error}</div>}
 
         <CreateAuctionForm
           onSubmit={handleSubmit}
-          onCancel={onClose}
+          onCancel={close}
+          onDirtyChange={setDirty}
+          initialMode={initialMode}
+          busy={loading}
+          onPropertyCreated={initialMode === "new" ? onClose : undefined}
         />
 
         {loading && <div style={{ marginTop: 12 }}>Creating…</div>}
@@ -168,28 +186,16 @@ async function handleSubmit(input: CreateAuctionInput) {
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <h4 style={{ margin: 0 }}>{title}</h4>
+      {title ? <h4 style={{ margin: 0 }}>{title}</h4> : null}
       {children}
     </section>
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <span style={{ fontSize: 12, color: "var(--dash-muted)" }}>{label}</span>
@@ -197,7 +203,6 @@ function Field({
     </label>
   );
 }
-
 
 export type CreateAuctionInput = {
   listingId: string;
@@ -215,7 +220,15 @@ export type CreateAuctionInput = {
 export function CreateAuctionForm({
   onSubmit,
   onCancel,
+  onDirtyChange,
+  onPropertyCreated,
+  initialMode = "existing",
+  busy = false,
 }: {
+  onPropertyCreated?: () => void;
+  busy?: boolean;
+  initialMode?: "existing" | "new";
+  onDirtyChange?: (dirty: boolean) => void;
   onSubmit: (data: CreateAuctionInput) => void;
   onCancel: () => void;
 }) {
@@ -228,10 +241,10 @@ export function CreateAuctionForm({
     authorizedAccountIds: [],
     status: "draft",
   });
-  const [listingMode, setListingMode] = useState<"existing" | "new">(
-    "existing",
-  );
-  const [listingForm, setListingForm] = useState(createBlankListingForm);
+  const [listingMode, setListingMode] = useState<"existing" | "new">(initialMode);
+  const [listingDirty, setListingDirty] = useState(false);
+  const [editingSelected, setEditingSelected] = useState(false);
+  const [auctionDirty, setAuctionDirty] = useState(false);
   const [managedListings, setManagedListings] = useState<IListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [listingsError, setListingsError] = useState<string | null>(null);
@@ -249,9 +262,7 @@ export function CreateAuctionForm({
       })
       .catch((cause) => {
         if (!active) return;
-        setListingsError(
-          cause instanceof Error ? cause.message : "Unable to load listings",
-        );
+        setListingsError(cause instanceof Error ? cause.message : "Unable to load listings");
       })
       .finally(() => {
         if (active) setListingsLoading(false);
@@ -262,24 +273,27 @@ export function CreateAuctionForm({
     };
   }, []);
 
-  function update<K extends keyof CreateAuctionInput>(
-    key: K,
-    value: CreateAuctionInput[K]
-  ) {
+  useEffect(() => {
+    onDirtyChange?.(listingDirty || auctionDirty);
+  }, [listingDirty, auctionDirty, onDirtyChange]);
+
+  function update<K extends keyof CreateAuctionInput>(key: K, value: CreateAuctionInput[K]) {
+    setAuctionDirty(true);
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const hasListing =
-    listingMode === "existing"
-      ? Boolean(form.listingId)
-      : Boolean(listingForm.title.trim() && listingForm.city.trim());
   const canSubmit =
-    hasListing &&
+    Boolean(form.listingId) &&
     form.startingBid > 0 &&
+    form.bidIncrement > 0 &&
     (!form.startDate || !form.endDate || form.startDate < form.endDate);
-
+  function mode(next: "existing" | "new") {
+    if (listingDirty && !window.confirm("Discard unsaved property changes? Saved drafts are kept."))
+      return;
+    setListingMode(next);
+  }
   return (
-    <form
+    <div
       style={{
         display: "flex",
         flexDirection: "column",
@@ -288,29 +302,31 @@ export function CreateAuctionForm({
       }}
     >
       {/* Listing */}
-      <Section title="Listing">
-        <div style={listingModeStyle}>
-          <button
-            type="button"
-            style={{
-              ...listingModeButton,
-              ...(listingMode === "existing" ? listingModeButtonActive : {}),
-            }}
-            onClick={() => setListingMode("existing")}
-          >
-            Existing listing
-          </button>
-          <button
-            type="button"
-            style={{
-              ...listingModeButton,
-              ...(listingMode === "new" ? listingModeButtonActive : {}),
-            }}
-            onClick={() => setListingMode("new")}
-          >
-            Create listing
-          </button>
-        </div>
+      <Section title={initialMode === "new" ? "" : "Listing"}>
+        {initialMode !== "new" ? (
+          <div style={listingModeStyle}>
+            <button
+              type="button"
+              style={{
+                ...listingModeButton,
+                ...(listingMode === "existing" ? listingModeButtonActive : {}),
+              }}
+              onClick={() => mode("existing")}
+            >
+              Existing listing
+            </button>
+            <button
+              type="button"
+              style={{
+                ...listingModeButton,
+                ...(listingMode === "new" ? listingModeButtonActive : {}),
+              }}
+              onClick={() => mode("new")}
+            >
+              Create listing
+            </button>
+          </div>
+        ) : null}
 
         {listingMode === "existing" ? (
           <>
@@ -319,7 +335,12 @@ export function CreateAuctionForm({
                 style={inputStyle}
                 value={form.listingId}
                 disabled={listingsLoading}
-                onChange={(event) => update("listingId", event.target.value)}
+                onChange={(event) => {
+                  if (!listingDirty || window.confirm("Discard unsaved property changes?")) {
+                    setEditingSelected(false);
+                    update("listingId", event.target.value);
+                  }
+                }}
               >
                 {managedListings.length ? null : (
                   <option value="">
@@ -334,141 +355,162 @@ export function CreateAuctionForm({
                 ))}
               </select>
             </Field>
+            {form.listingId && !editingSelected ? (
+              <button type="button" onClick={() => setEditingSelected(true)}>
+                Edit selected property
+              </button>
+            ) : null}
+            {editingSelected &&
+            managedListings.find((item) => item.listingId === form.listingId) ? (
+              <ListingEditorSection
+                key={form.listingId}
+                listing={managedListings.find((item) => item.listingId === form.listingId)!}
+                onDirtyChange={setListingDirty}
+                onUpdated={(listing) =>
+                  setManagedListings((items) =>
+                    items.map((item) => (item.listingId === listing.listingId ? listing : item)),
+                  )
+                }
+              />
+            ) : null}
             {listingsError ? (
-              <div style={{ color: "var(--dash-danger)", fontSize: 12 }}>
-                {listingsError}
-              </div>
+              <div style={{ color: "var(--dash-danger)", fontSize: 12 }}>{listingsError}</div>
             ) : null}
           </>
         ) : (
-          <ListingFormFields
-            form={listingForm}
-            setForm={setListingForm}
-            showWorkflow
+          <ListingCreation
+            onDirtyChange={setListingDirty}
+            onCreated={(listing) => {
+              setManagedListings((items) => [
+                listing,
+                ...items.filter((item) => item.listingId !== listing.listingId),
+              ]);
+              setForm((current) => ({ ...current, listingId: listing.listingId }));
+              setListingMode("existing");
+              setListingDirty(false);
+              onPropertyCreated?.();
+            }}
           />
         )}
       </Section>
+      {listingMode === "existing" ? (
+        <>
+          {/* Bidding */}
+          <Section title="Bidding">
+            <Field label="Starting Bid">
+              <input
+                style={inputStyle}
+                type="number"
+                min={0}
+                value={form.startingBid}
+                onChange={(e) => update("startingBid", Number(e.target.value))}
+              />
+            </Field>
 
-      {/* Bidding */}
-      <Section title="Bidding">
-        <Field label="Starting Bid">
-          <input
-            style={inputStyle}
-            type="number"
-            min={0}
-            value={form.startingBid}
-            onChange={(e) =>
-              update("startingBid", Number(e.target.value))
-            }
-          />
-        </Field>
+            <Field label="Bid Increment">
+              <input
+                style={inputStyle}
+                type="number"
+                min={1}
+                value={form.bidIncrement}
+                onChange={(e) => update("bidIncrement", Number(e.target.value))}
+              />
+            </Field>
 
-        <Field label="Bid Increment">
-          <input
-            style={inputStyle}
-            type="number"
-            min={1}
-            value={form.bidIncrement}
-            onChange={(e) =>
-              update("bidIncrement", Number(e.target.value))
-            }
-          />
-        </Field>
+            <Field label="Currency">
+              <select
+                style={inputStyle}
+                value={form.currency}
+                onChange={(e) => update("currency", e.target.value)}
+              >
+                <option value="USD">USD</option>
+              </select>
+            </Field>
+          </Section>
 
-        <Field label="Currency">
-          <select
-            style={inputStyle}
-            value={form.currency}
-            onChange={(e) => update("currency", e.target.value)}
-          >
-            <option value="USD">USD</option>
-          </select>
-        </Field>
-      </Section>
+          {/* Schedule */}
+          <Section title="Schedule">
+            <Field label="Start Date">
+              <input
+                style={inputStyle}
+                type="datetime-local"
+                value={form.startDate ?? ""}
+                onChange={(e) => update("startDate", e.target.value)}
+              />
+            </Field>
 
-      {/* Schedule */}
-      <Section title="Schedule">
-        <Field label="Start Date">
-          <input
-            style={inputStyle}
-            type="datetime-local"
-            value={form.startDate ?? ""}
-            onChange={(e) => update("startDate", e.target.value)}
-          />
-        </Field>
+            <Field label="End Date">
+              <input
+                style={inputStyle}
+                type="datetime-local"
+                value={form.endDate ?? ""}
+                onChange={(e) => update("endDate", e.target.value)}
+              />
+            </Field>
+          </Section>
 
-        <Field label="End Date">
-          <input
-            style={inputStyle}
-            type="datetime-local"
-            value={form.endDate ?? ""}
-            onChange={(e) => update("endDate", e.target.value)}
-          />
-        </Field>
-      </Section>
+          {/* Visibility */}
+          <Section title="Visibility">
+            <label style={{ display: "flex", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={form.isPrivate}
+                onChange={(e) => update("isPrivate", e.target.checked)}
+              />
+              Private auction
+            </label>
+            {form.isPrivate ? (
+              <Field label="Authorized account IDs">
+                <textarea
+                  style={{ ...inputStyle, minHeight: 76, resize: "vertical" }}
+                  value={form.authorizedAccountIds.join("\n")}
+                  placeholder="One account ID per line"
+                  onChange={(event) =>
+                    update(
+                      "authorizedAccountIds",
+                      event.target.value
+                        .split(/[\n,]/)
+                        .map((id) => id.trim())
+                        .filter(Boolean),
+                    )
+                  }
+                />
+              </Field>
+            ) : null}
+          </Section>
 
-      {/* Visibility */}
-      <Section title="Visibility">
-        <label style={{ display: "flex", gap: 8 }}>
-          <input
-            type="checkbox"
-            checked={form.isPrivate}
-            onChange={(e) => update("isPrivate", e.target.checked)}
-          />
-          Private auction
-        </label>
-        {form.isPrivate ? (
-          <Field label="Authorized account IDs">
-            <textarea
-              style={{ ...inputStyle, minHeight: 76, resize: "vertical" }}
-              value={form.authorizedAccountIds.join("\n")}
-              placeholder="One account ID per line"
-              onChange={(event) => update(
-                "authorizedAccountIds",
-                event.target.value.split(/[\n,]/).map((id) => id.trim()).filter(Boolean),
-              )}
-            />
-          </Field>
-        ) : null}
-      </Section>
+          {/* Status */}
+          <Section title="Status">
+            <select
+              style={inputStyle}
+              value={form.status}
+              onChange={(e) => update("status", e.target.value as "draft" | "scheduled")}
+            >
+              <option value="draft">Draft</option>
+              <option value="scheduled">Scheduled</option>
+            </select>
+          </Section>
 
-      {/* Status */}
-      <Section title="Status">
-        <select
-          style={inputStyle}
-          value={form.status}
-          onChange={(e) =>
-            update("status", e.target.value as "draft" | "scheduled")
-          }
-        >
-          <option value="draft">Draft</option>
-          <option value="scheduled">Scheduled</option>
-        </select>
-      </Section>
-
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 12 }}>
-        <button type="button" onClick={onCancel} style={secondaryBtn}>
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() =>
-            onSubmit({
-              ...form,
-              listingId: listingMode === "existing" ? form.listingId : "",
-              listing:
-                listingMode === "new"
-                  ? listingFormToCreateInput(listingForm)
-                  : undefined,
-            })
-          }
-          style={{ ...primaryBtn, opacity: canSubmit ? 1 : 0.55, cursor: canSubmit ? "pointer" : "not-allowed" }}
-        >
-          Create Auction
-        </button>
-      </div>
-    </form>
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 12 }}>
+            <button type="button" onClick={onCancel} style={secondaryBtn}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!canSubmit || busy || listingDirty}
+              onClick={() => onSubmit(form)}
+              style={{
+                ...primaryBtn,
+                opacity: canSubmit ? 1 : 0.55,
+                cursor: canSubmit ? "pointer" : "not-allowed",
+              }}
+            >
+              Create Auction
+            </button>
+          </div>
+        </>
+      ) : null}
+    </div>
   );
 }

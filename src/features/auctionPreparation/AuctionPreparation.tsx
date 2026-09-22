@@ -484,7 +484,7 @@ export default function AuctionPreparation({
               />
             </dl>
             <div className="preparation__callout">
-              <h3>Approved property information</h3>
+              <h3>Current property information</h3>
               <p>{row.listing.description?.overview || "No property description provided."}</p>
               <p>
                 {checks.find((c) => c.code === "auction_terms")?.satisfied
@@ -517,8 +517,8 @@ export default function AuctionPreparation({
             {editingProperty ? (
               <>
                 <p className="preparation__hint">
-                  Property corrections are saved separately from auction terms. Changes here do not
-                  replace the approved listing snapshot; use listing review for revised terms.
+                  Corrections update the current operational listing. Changes here do not replace
+                  the approved listing snapshot; use listing review for revised terms.
                 </p>
                 <ListingEditorSection
                   listing={row.listing}

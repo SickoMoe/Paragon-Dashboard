@@ -1,669 +1,309 @@
-import { useState, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import type { IListing } from "../../interfaces/IListing";
-import type { CreateListingInput, ListingPatch } from "../listingApi";
-import { inputStyle } from "../auctionDrawer/styles";
-
-export type ListingFormState = {
-  title: string;
-  type: string;
-  address: string;
-  city: string;
-  state: string;
-  zipcode: string;
-  latitude: string;
-  longitude: string;
-  overview: string;
-  detailedDescription: string;
-  thumbnailUrl: string;
-  images: string;
-  bedrooms: string;
-  bathrooms: string;
-  buildingSQFT: string;
-  lotSize: string;
-  yearBuilt: string;
-  amenities: string;
-  titleStatus: string;
-  zoningInformation: string;
-  sellerName: string;
-  sellerContact: string;
-  biddingSupport: string;
-  financingOptions: string;
-  inspectionDetails: string;
-  termsAndConditions: string;
-  socialSharing: boolean;
-  workflowStatus: "draft" | "published";
-};
-
-export function createBlankListingForm(): ListingFormState {
-  return {
-    title: "",
-    type: "Residential",
-    address: "",
-    city: "",
-    state: "",
-    zipcode: "",
-    latitude: "",
-    longitude: "",
-    overview: "",
-    detailedDescription: "",
-    thumbnailUrl: "",
-    images: "",
-    bedrooms: "0",
-    bathrooms: "0",
-    buildingSQFT: "",
-    lotSize: "",
-    yearBuilt: "",
-    amenities: "",
-    titleStatus: "",
-    zoningInformation: "",
-    sellerName: "",
-    sellerContact: "",
-    biddingSupport: "",
-    financingOptions: "",
-    inspectionDetails: "",
-    termsAndConditions: "",
-    socialSharing: true,
-    workflowStatus: "draft",
-  };
-}
-
-export function listingToForm(listing: IListing): ListingFormState {
-  const location = listing.basicInformation.location;
-  return {
-    title: listing.basicInformation.title ?? "",
-    type: listing.basicInformation.type ?? "Residential",
-    address: location.address ?? "",
-    city: location.city ?? "",
-    state: location.state ?? "",
-    zipcode: location.zipcode ?? "",
-    latitude: formatCoordinate(location.latitude),
-    longitude: formatCoordinate(location.longitude),
-    overview: listing.description.overview ?? "",
-    detailedDescription: listing.description.detailedDescription ?? "",
-    thumbnailUrl: listing.media.thumbnailUrl ?? "",
-    images: (listing.media.images ?? []).join("\n"),
-    bedrooms: String(listing.propertyFeatures.bedrooms ?? 0),
-    bathrooms: String(listing.propertyFeatures.bathrooms ?? 0),
-    buildingSQFT: listing.propertyFeatures.buildingSQFT ?? "",
-    lotSize: listing.propertyFeatures.lotSize ?? "",
-    yearBuilt: listing.propertyFeatures.yearBuilt
-      ? String(listing.propertyFeatures.yearBuilt)
-      : "",
-    amenities: (listing.propertyFeatures.amenities ?? []).join("\n"),
-    titleStatus: listing.legalInformation.titleStatus ?? "",
-    zoningInformation: listing.legalInformation.zoningInformation ?? "",
-    sellerName: listing.contactInformation.seller.name ?? "",
-    sellerContact: listing.contactInformation.seller.contactDetails ?? "",
-    biddingSupport:
-      listing.contactInformation.biddingSupport.contactDetails ?? "",
-    financingOptions: (
-      listing.additionalInformation.financingOptions ?? []
-    ).join("\n"),
-    inspectionDetails:
-      listing.additionalInformation.inspectionDetails ?? "",
-    termsAndConditions: listing.termsAndConditions ?? "",
-    socialSharing: Boolean(listing.socialSharing),
-    workflowStatus:
-      listing.workflowStatus === "published" ? "published" : "draft",
-  };
-}
-
-export function listingFormToPatch(form: ListingFormState): ListingPatch {
-  return {
-    basicInformation: {
-      title: form.title.trim(),
-      type: form.type.trim(),
-      location: {
-        address: form.address.trim(),
-        city: form.city.trim(),
-        state: form.state.trim(),
-        zipcode: form.zipcode.trim(),
-        latitude: optionalNumber(form.latitude),
-        longitude: optionalNumber(form.longitude),
-      },
-    },
-    description: {
-      overview: form.overview.trim(),
-      detailedDescription: form.detailedDescription.trim(),
-    },
-    media: {
-      thumbnailUrl: form.thumbnailUrl.trim() || undefined,
-      images: splitLines(form.images),
-    },
-    propertyFeatures: {
-      bedrooms: numberOrZero(form.bedrooms),
-      bathrooms: numberOrZero(form.bathrooms),
-      buildingSQFT: form.buildingSQFT.trim(),
-      lotSize: form.lotSize.trim(),
-      yearBuilt: numberOrZero(form.yearBuilt),
-      amenities: splitLines(form.amenities),
-    },
-    legalInformation: {
-      titleStatus: form.titleStatus.trim(),
-      zoningInformation: form.zoningInformation.trim() || undefined,
-    },
-    contactInformation: {
-      seller: {
-        name: form.sellerName.trim(),
-        contactDetails: form.sellerContact.trim(),
-      },
-      biddingSupport: {
-        contactDetails: form.biddingSupport.trim(),
-      },
-    },
-    additionalInformation: {
-      financingOptions: splitLines(form.financingOptions),
-      inspectionDetails: form.inspectionDetails.trim() || undefined,
-    },
-    socialSharing: form.socialSharing,
-    termsAndConditions: form.termsAndConditions.trim(),
-    tags: {
-      type: form.type.trim().toLowerCase().replace(/\s+/g, "-"),
-    },
-  };
-}
-
-export function listingFormToCreateInput(
-  form: ListingFormState,
-): CreateListingInput {
-  const patch = listingFormToPatch(form);
-  return {
-    moderationStatus: "pending",
-    workflowStatus: form.workflowStatus,
-    basicInformation: patch.basicInformation as IListing["basicInformation"],
-    description: patch.description as IListing["description"],
-    media: {
-      ...(patch.media as IListing["media"]),
-      videos: [],
-    },
-    propertyFeatures:
-      patch.propertyFeatures as IListing["propertyFeatures"],
-    legalInformation: patch.legalInformation as IListing["legalInformation"],
-    contactInformation:
-      patch.contactInformation as IListing["contactInformation"],
-    additionalInformation:
-      patch.additionalInformation as IListing["additionalInformation"],
-    socialSharing: Boolean(patch.socialSharing),
-    termsAndConditions: String(patch.termsAndConditions ?? ""),
-    tags: patch.tags ?? {},
-  };
-}
-
+import { useState, type Dispatch, type SetStateAction, type ReactNode } from "react";
+import AddressSearch from "./AddressSearch";
+import ListingPhotos from "./ListingPhotos";
+import { listingSteps, validateForm, type ListingFormState, type FormErrors } from "./listingForm";
+import "./listingEditor.css";
 export function ListingFormFields({
   form,
   setForm,
-  showWorkflow = false,
+  step: controlledStep,
+  onStepChange,
+  errors = {},
+  onBusyChange,
+  disabled = false,
 }: {
   form: ListingFormState;
   setForm: Dispatch<SetStateAction<ListingFormState>>;
+  step?: number;
+  onStepChange?: (step: number) => void;
+  errors?: FormErrors;
+  onBusyChange?: (busy: boolean) => void;
+  disabled?: boolean;
   showWorkflow?: boolean;
 }) {
-  const [locationState, setLocationState] = useState<
-    "idle" | "loading" | "success" | "error"
-  >("idle");
-
-  const update = <K extends keyof ListingFormState>(
-    key: K,
-    value: ListingFormState[K],
-  ) => setForm((current) => ({ ...current, [key]: value }));
-
-  const useCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationState("error");
-      return;
-    }
-
-    setLocationState("loading");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setForm((current) => ({
-          ...current,
-          latitude: position.coords.latitude.toFixed(6),
-          longitude: position.coords.longitude.toFixed(6),
-        }));
-        setLocationState("success");
-      },
-      () => setLocationState("error"),
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 60_000 },
-    );
+  const [localStep, setLocalStep] = useState(0);
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+  const [uploading, setUploading] = useState(false);
+  const step = controlledStep ?? localStep;
+  const go = (value: number) => {
+    if (uploading) return;
+    setLocalStep(value);
+    onStepChange?.(value);
   };
-
+  const update = <K extends keyof ListingFormState>(key: K, value: ListingFormState[K]) =>
+    setForm((f) => ({
+      ...f,
+      [key]: value,
+      ...(["address", "city", "state", "zipcode"].includes(key)
+        ? { latitude: "", longitude: "" }
+        : {}),
+    }));
+  const live = validateForm(form);
+  const message = (key: keyof ListingFormState) =>
+    errors[key] || (touched.has(key) ? live[key] : undefined);
+  const field = (
+    key: keyof ListingFormState,
+    label: string,
+    options: { required?: boolean; multiline?: boolean; number?: boolean; hint?: string } = {},
+  ) => (
+    <Field
+      key={key}
+      label={label}
+      required={options.required}
+      error={message(key)}
+      hint={options.hint}
+    >
+      {options.multiline ? (
+        <textarea
+          aria-label={label}
+          aria-invalid={Boolean(message(key))}
+          rows={4}
+          value={String(form[key])}
+          onChange={(e) => update(key, e.target.value as never)}
+          onBlur={() => setTouched((s) => new Set(s).add(key))}
+        />
+      ) : (
+        <input
+          aria-label={label}
+          aria-invalid={Boolean(message(key))}
+          inputMode={options.number ? "decimal" : undefined}
+          value={String(form[key])}
+          onChange={(e) => update(key, e.target.value as never)}
+          onBlur={() => setTouched((s) => new Set(s).add(key))}
+        />
+      )}
+    </Field>
+  );
   return (
-    <div style={styles.form}>
-      <FormSection title="Property">
-        <div style={styles.twoColumns}>
-          <Field label="Listing title">
-            <input
-              style={inputStyle}
-              value={form.title}
-              onChange={(event) => update("title", event.target.value)}
-            />
-          </Field>
-          <Field label="Property type">
-            <select
-              style={inputStyle}
-              value={form.type}
-              onChange={(event) => update("type", event.target.value)}
-            >
-              <option>Residential</option>
-              <option>Condo</option>
-              <option>Multi Family</option>
-              <option>Commercial</option>
-              <option>Land</option>
-            </select>
-          </Field>
-        </div>
-        <Field label="Street address">
-          <input
-            style={inputStyle}
-            value={form.address}
-            onChange={(event) => update("address", event.target.value)}
-          />
-        </Field>
-        <div style={styles.locationGrid}>
-          <Field label="City">
-            <input
-              style={inputStyle}
-              value={form.city}
-              onChange={(event) => update("city", event.target.value)}
-            />
-          </Field>
-          <Field label="State">
-            <input
-              style={inputStyle}
-              value={form.state}
-              onChange={(event) => update("state", event.target.value)}
-            />
-          </Field>
-          <Field label="Zip code">
-            <input
-              style={inputStyle}
-              value={form.zipcode}
-              onChange={(event) => update("zipcode", event.target.value)}
-            />
-          </Field>
-        </div>
-        <div style={styles.coordinateHeader}>
-          <span style={styles.coordinateLabel}>Map coordinates</span>
+    <div className="listing-editor">
+      <nav aria-label="Property form sections" className="listing-editor__steps">
+        {listingSteps.map((label, i) => (
           <button
+            key={label}
             type="button"
-            style={styles.locationButton}
-            onClick={useCurrentLocation}
-            disabled={locationState === "loading"}
+            aria-current={step === i ? "step" : undefined}
+            disabled={uploading || disabled}
+            onClick={() => go(i)}
           >
-            {locationState === "loading" ? "Locating..." : "Use current location"}
+            {label}
           </button>
-        </div>
-        <div style={styles.twoColumns}>
-          <Field label="Latitude">
-            <input
-              inputMode="decimal"
-              style={inputStyle}
-              value={form.latitude}
-              onChange={(event) => update("latitude", event.target.value)}
-            />
-          </Field>
-          <Field label="Longitude">
-            <input
-              inputMode="decimal"
-              style={inputStyle}
-              value={form.longitude}
-              onChange={(event) => update("longitude", event.target.value)}
-            />
-          </Field>
-        </div>
-        {locationState === "success" ? (
-          <span style={styles.success}>Coordinates added.</span>
+        ))}
+      </nav>
+      <p className="listing-hint">
+        {listingSteps[step]} · {step + 1} of {listingSteps.length}. Move between sections freely.
+        Required fields apply when completing the property.
+      </p>
+      <fieldset disabled={disabled || uploading} className="listing-editor__fields">
+        {step === 0 ? (
+          <>
+            <div className="listing-grid">
+              {field("title", "Listing title", { required: true })}
+              <Field label="Property type" required error={message("type")}>
+                <select
+                  aria-label="Property type"
+                  value={form.type}
+                  onChange={(e) => update("type", e.target.value)}
+                >
+                  {[
+                    ...new Set([
+                      "Residential",
+                      "Condo",
+                      "Multi Family",
+                      "Commercial",
+                      "Land",
+                      form.type,
+                    ]),
+                  ]
+                    .filter(Boolean)
+                    .map((type) => (
+                      <option key={type}>{type}</option>
+                    ))}
+                </select>
+              </Field>
+            </div>
+            <AddressSearch form={form} setForm={setForm} disabled={disabled} />
+            {field("address", "Street address", { required: true })}
+            <div className="listing-grid">
+              {field("city", "City", { required: true })}
+              {field("state", "State", { required: true })}
+              {field("zipcode", "ZIP code", { required: true })}
+            </div>
+            <p className="listing-hint">
+              Changing the address clears the old map pin. Use address search or “Find coordinates”
+              to select the corrected location.
+            </p>
+            <details open={Boolean(message("latitude") || message("longitude")) || undefined}>
+              <summary>Advanced: correct map coordinates</summary>
+              <div className="listing-grid">
+                {field("latitude", "Latitude", { number: true })}
+                {field("longitude", "Longitude", { number: true })}
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, latitude: "", longitude: "" }))}
+              >
+                Clear map coordinates
+              </button>
+            </details>
+          </>
         ) : null}
-        {locationState === "error" ? (
-          <span style={styles.error}>
-            Location is unavailable. Enter coordinates manually.
-          </span>
+        {step === 1 ? (
+          <>
+            <div className="listing-grid">
+              {field("bedrooms", "Bedrooms", { number: true })}
+              {field("bathrooms", "Bathrooms", { number: true })}
+              {field("buildingSQFT", "Square footage")}
+              {field("lotSize", "Lot size")}
+              {field("yearBuilt", "Year built", { number: true })}
+            </div>
+            {field("overview", "Overview", { required: true, multiline: true })}
+            {field("detailedDescription", "Detailed description", { multiline: true })}
+            <details>
+              <summary>Optional amenities</summary>
+              {field("amenities", "Amenities", { multiline: true, hint: "One amenity per line." })}
+            </details>
+          </>
         ) : null}
-      </FormSection>
-
-      <FormSection title="Description">
-        <Field label="Overview">
-          <textarea
-            style={styles.textarea}
-            value={form.overview}
-            onChange={(event) => update("overview", event.target.value)}
+        {step === 2 ? (
+          <ListingPhotos
+            form={form}
+            setForm={setForm}
+            disabled={disabled}
+            onBusyChange={(value) => {
+              setUploading(value);
+              onBusyChange?.(value);
+            }}
           />
-        </Field>
-        <Field label="Detailed description">
-          <textarea
-            style={{ ...styles.textarea, minHeight: 120 }}
-            value={form.detailedDescription}
-            onChange={(event) =>
-              update("detailedDescription", event.target.value)
-            }
-          />
-        </Field>
-      </FormSection>
-
-      <FormSection title="Media">
-        <Field label="Thumbnail URL">
-          <input
-            style={inputStyle}
-            value={form.thumbnailUrl}
-            onChange={(event) => update("thumbnailUrl", event.target.value)}
-          />
-        </Field>
-        <Field label="Image URLs, one per line">
-          <textarea
-            style={styles.textarea}
-            value={form.images}
-            onChange={(event) => update("images", event.target.value)}
-          />
-        </Field>
-      </FormSection>
-
-      <FormSection title="Property details">
-        <div style={styles.detailGrid}>
-          <Field label="Bedrooms">
-            <input
-              type="number"
-              min="0"
-              step="1"
-              style={inputStyle}
-              value={form.bedrooms}
-              onChange={(event) => update("bedrooms", event.target.value)}
-            />
-          </Field>
-          <Field label="Bathrooms">
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              style={inputStyle}
-              value={form.bathrooms}
-              onChange={(event) => update("bathrooms", event.target.value)}
-            />
-          </Field>
-          <Field label="Square feet">
-            <input
-              style={inputStyle}
-              value={form.buildingSQFT}
-              onChange={(event) => update("buildingSQFT", event.target.value)}
-            />
-          </Field>
-          <Field label="Lot size">
-            <input
-              style={inputStyle}
-              value={form.lotSize}
-              onChange={(event) => update("lotSize", event.target.value)}
-            />
-          </Field>
-          <Field label="Year built">
-            <input
-              type="number"
-              min="0"
-              style={inputStyle}
-              value={form.yearBuilt}
-              onChange={(event) => update("yearBuilt", event.target.value)}
-            />
-          </Field>
-        </div>
-        <Field label="Amenities, one per line">
-          <textarea
-            style={styles.textarea}
-            value={form.amenities}
-            onChange={(event) => update("amenities", event.target.value)}
-          />
-        </Field>
-      </FormSection>
-
-      <FormSection title="Legal and sale details">
-        <div style={styles.twoColumns}>
-          <Field label="Title status">
-            <input
-              style={inputStyle}
-              value={form.titleStatus}
-              onChange={(event) => update("titleStatus", event.target.value)}
-            />
-          </Field>
-          <Field label="Zoning">
-            <input
-              style={inputStyle}
-              value={form.zoningInformation}
-              onChange={(event) =>
-                update("zoningInformation", event.target.value)
-              }
-            />
-          </Field>
-        </div>
-        <Field label="Inspection details">
-          <textarea
-            style={styles.textarea}
-            value={form.inspectionDetails}
-            onChange={(event) =>
-              update("inspectionDetails", event.target.value)
-            }
-          />
-        </Field>
-        <Field label="Financing options, one per line">
-          <textarea
-            style={styles.textarea}
-            value={form.financingOptions}
-            onChange={(event) =>
-              update("financingOptions", event.target.value)
-            }
-          />
-        </Field>
-        <Field label="Terms and conditions">
-          <textarea
-            style={{ ...styles.textarea, minHeight: 110 }}
-            value={form.termsAndConditions}
-            onChange={(event) =>
-              update("termsAndConditions", event.target.value)
-            }
-          />
-        </Field>
-      </FormSection>
-
-      <FormSection title="Contacts">
-        <div style={styles.twoColumns}>
-          <Field label="Seller name">
-            <input
-              style={inputStyle}
-              value={form.sellerName}
-              onChange={(event) => update("sellerName", event.target.value)}
-            />
-          </Field>
-          <Field label="Seller contact">
-            <input
-              style={inputStyle}
-              value={form.sellerContact}
-              onChange={(event) => update("sellerContact", event.target.value)}
-            />
-          </Field>
-        </div>
-        <Field label="Bidding support contact">
-          <input
-            style={inputStyle}
-            value={form.biddingSupport}
-            onChange={(event) => update("biddingSupport", event.target.value)}
-          />
-        </Field>
-        <label style={styles.checkbox}>
-          <input
-            type="checkbox"
-            checked={form.socialSharing}
-            onChange={(event) =>
-              update("socialSharing", event.target.checked)
-            }
-          />
-          Allow social sharing
-        </label>
-      </FormSection>
-
-      {showWorkflow ? (
-        <FormSection title="Publication">
-          <Field label="Create as">
-            <select
-              style={inputStyle}
-              value={form.workflowStatus}
-              onChange={(event) =>
-                update(
-                  "workflowStatus",
-                  event.target.value as ListingFormState["workflowStatus"],
-                )
-              }
-            >
-              <option value="draft">Draft listing</option>
-              <option value="published">Published listing</option>
-            </select>
-          </Field>
-        </FormSection>
+        ) : null}
+        {step === 3 ? (
+          <>
+            <h4>Seller contact</h4>
+            <div className="listing-grid">
+              {field("sellerName", "Seller name")}
+              {field("sellerContact", "Seller email or phone")}
+            </div>
+            {field("biddingSupport", "Bidding support contact")}
+            <details>
+              <summary>Legal & additional information (optional)</summary>
+              <div className="listing-grid">
+                {field("titleStatus", "Title status")}
+                {field("zoningInformation", "Zoning")}
+              </div>
+              {field("inspectionDetails", "Inspection details", { multiline: true })}
+              {field("financingOptions", "Financing options", {
+                multiline: true,
+                hint: "One option per line.",
+              })}
+            </details>
+          </>
+        ) : null}
+        {step === 4 ? (
+          <>
+            {field("termsAndConditions", "Terms and conditions", {
+              multiline: true,
+              hint: "Auction launch requires approved terms. Saving operational terms does not replace a historical approved review.",
+            })}
+            <label className="listing-check">
+              <input
+                type="checkbox"
+                checked={form.socialSharing}
+                onChange={(e) => update("socialSharing", e.target.checked)}
+              />
+              Allow social sharing
+            </label>
+            <div className="listing-review">
+              <h4>Property summary</h4>
+              <strong>{form.title || "Title not added"}</strong>
+              <p>
+                {[form.address, form.city, form.state, form.zipcode].filter(Boolean).join(", ") ||
+                  "Address not added"}
+              </p>
+              <p>
+                {form.type} · {form.bedrooms || 0} beds · {form.bathrooms || 0} baths
+              </p>
+              <p>
+                {form.images.split("\n").filter(Boolean).length} photos ·{" "}
+                {form.latitude && form.longitude ? "Map coordinates set" : "No map coordinates"}
+              </p>
+            </div>
+            {Object.entries(validateForm(form, true)).length ? (
+              <div className="listing-warning">
+                <strong>Before completing the property</strong>
+                <ul>
+                  {Object.entries(validateForm(form, true)).map(([key, value]) => (
+                    <li key={key}>
+                      <button type="button" onClick={() => go(key === "overview" ? 1 : 0)}>
+                        {(
+                          {
+                            title: "Listing title",
+                            type: "Property type",
+                            address: "Street address",
+                            city: "City",
+                            state: "State",
+                            zipcode: "ZIP code",
+                          } as Record<string, string>
+                        )[key] || key}
+                        : {value}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p>You can save an incomplete draft at any time.</p>
+              </div>
+            ) : (
+              <p className="listing-success">Required property information is complete.</p>
+            )}
+          </>
+        ) : null}
+      </fieldset>
+      {message("images") ? (
+        <p role="alert" className="listing-error">
+          {message("images")}
+        </p>
       ) : null}
+      <div className="listing-editor__navigation">
+        <button
+          type="button"
+          disabled={step === 0 || disabled || uploading}
+          onClick={() => go(step - 1)}
+        >
+          Back
+        </button>
+        {step < 4 ? (
+          <button type="button" disabled={disabled || uploading} onClick={() => go(step + 1)}>
+            Continue →
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
-
-function FormSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <fieldset style={styles.section}>
-      <legend style={styles.legend}>{title}</legend>
-      <div style={styles.sectionBody}>{children}</div>
-    </fieldset>
-  );
-}
-
 function Field({
   label,
+  required,
+  error,
+  hint,
   children,
 }: {
   label: string;
+  required?: boolean;
+  error?: string;
+  hint?: string;
   children: ReactNode;
 }) {
   return (
-    <label style={styles.field}>
-      <span style={styles.label}>{label}</span>
+    <label className="listing-field">
+      <span>
+        {label}
+        {required ? <small>Required</small> : null}
+      </span>
       {children}
+      {hint ? <small>{hint}</small> : null}
+      {error ? (
+        <small className="listing-error" role="alert">
+          {error}
+        </small>
+      ) : null}
     </label>
   );
 }
-
-function splitLines(value: string) {
-  return value
-    .split(/\r?\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function optionalNumber(value: string) {
-  if (!value.trim()) return undefined;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : undefined;
-}
-
-function numberOrZero(value: string) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
-}
-
-function formatCoordinate(value?: number) {
-  return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
-}
-
-const styles: Record<string, CSSProperties> = {
-  form: {
-    display: "grid",
-    gap: 22,
-  },
-  section: {
-    minWidth: 0,
-    margin: 0,
-    padding: "20px 0 0",
-    border: 0,
-    borderTop: "1px solid var(--dash-border)",
-  },
-  legend: {
-    padding: "0 12px 0 0",
-    color: "var(--dash-ink)",
-    fontSize: 14,
-    fontWeight: 800,
-  },
-  sectionBody: {
-    display: "grid",
-    gap: 12,
-  },
-  twoColumns: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 12,
-  },
-  locationGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) 110px 130px",
-    gap: 12,
-  },
-  detailGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: 12,
-  },
-  field: {
-    minWidth: 0,
-    display: "grid",
-    gap: 6,
-  },
-  label: {
-    color: "var(--dash-muted)",
-    fontSize: 12,
-    fontWeight: 650,
-  },
-  textarea: {
-    ...inputStyle,
-    minHeight: 82,
-    paddingTop: 10,
-    paddingBottom: 10,
-    resize: "vertical",
-    lineHeight: 1.45,
-  },
-  coordinateHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  coordinateLabel: {
-    color: "var(--dash-muted)",
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  locationButton: {
-    minHeight: 34,
-    padding: "0 12px",
-    border: "1px solid var(--dash-border)",
-    borderRadius: 6,
-    background: "var(--dash-card)",
-    color: "var(--dash-ink)",
-    cursor: "pointer",
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  checkbox: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    color: "var(--dash-ink)",
-    fontSize: 13,
-  },
-  success: {
-    color: "var(--dash-success)",
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  error: {
-    color: "var(--dash-danger)",
-    fontSize: 12,
-    fontWeight: 700,
-  },
-};

@@ -2,22 +2,14 @@ import { useState } from "react";
 import { Outlet, useLoaderData, useNavigate } from "react-router-dom";
 import { AuctionsToolbar } from "../../features/auctions/components/AuctionsToolbar";
 import { AuctionsTable } from "../../features/auctions/components/AuctionTable";
-import {
-  AuctionPageProvider,
-  useDashboardPageContext,
-} from "./auctionPageContext";
+import { AuctionPageProvider, useDashboardPageContext } from "./auctionPageContext";
 import { DashboardFrame } from "../../core/layout/DashboardFrame";
 import type { AuctionOverview } from "../../features/auctions/types";
 import { AuctionsInsights } from "../../features/AuctionsInsights";
-import {
-  AuctionCounts,
-  AuctionsTabs,
-} from "../../features/auctions/components/AuctionsTabs";
+import { AuctionCounts, AuctionsTabs } from "../../features/auctions/components/AuctionsTabs";
 import { CreateAuctionModal } from "../../features/auctionCreate/CreateAuctionDrawer";
 import { createAuction } from "../../features/auctions/services/auctionDashboardApi";
-import {
-  createListing as createPropertyListing,
-} from "../../features/listingApi";
+import { createListing as createPropertyListing } from "../../features/listingApi";
 
 const toISO = (v?: string) => (v ? new Date(v).toISOString() : undefined);
 
@@ -33,16 +25,10 @@ export default function AuctionsPage() {
 
 function AuctionsPageContent() {
   const [creating, setCreating] = useState(false);
+  const [creationMode, setCreationMode] = useState<"existing" | "new">("existing");
   const navigate = useNavigate();
-  const {
-    auctions,
-    filteredAuctions,
-    tab,
-    setTab,
-    search,
-    setSearch,
-    handleCreated,
-  } = useDashboardPageContext();
+  const { auctions, filteredAuctions, tab, setTab, search, setSearch, handleCreated } =
+    useDashboardPageContext();
 
   const counts: AuctionCounts = auctions.reduce(
     (acc, row) => {
@@ -61,7 +47,25 @@ function AuctionsPageContent() {
         toolbar={<AuctionsToolbar search={search} onSearch={setSearch} />}
         action={
           <div className="dashActionGroup">
-            <button type="button" className="dashActionSecondary" onClick={() => setCreating(true)}>Create auction manually</button>
+            <button
+              type="button"
+              onClick={() => {
+                setCreationMode("new");
+                setCreating(true);
+              }}
+            >
+              Create property
+            </button>
+            <button
+              type="button"
+              className="dashActionSecondary"
+              onClick={() => {
+                setCreationMode("existing");
+                setCreating(true);
+              }}
+            >
+              Create auction manually
+            </button>
           </div>
         }
       />
@@ -69,7 +73,12 @@ function AuctionsPageContent() {
       <AuctionsTable
         rows={filteredAuctions}
         onRowClick={(row) => {
-          if (row.auctionDraft || ["draft", "pending_approval", "changes_requested", "scheduled"].includes(row.auction.status)) {
+          if (
+            row.auctionDraft ||
+            ["draft", "pending_approval", "changes_requested", "scheduled"].includes(
+              row.auction.status,
+            )
+          ) {
             navigate(`/auctions/${row.auction.id}/edit`);
             return;
           }
@@ -81,11 +90,10 @@ function AuctionsPageContent() {
 
       {creating && (
         <CreateAuctionModal
+          initialMode={creationMode}
           onClose={() => setCreating(false)}
           onSubmit={async (input) => {
-            const listing = input.listing
-              ? await createPropertyListing(input.listing)
-              : null;
+            const listing = input.listing ? await createPropertyListing(input.listing) : null;
             const listingId = listing?.listingId ?? input.listingId;
             if (!listingId) throw new Error("A listing is required.");
 

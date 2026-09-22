@@ -7,7 +7,7 @@ export type ListingModerationStatus = "pending" | "approved" | "denied" | "remov
 
 export function updateListingStatus(
   listing: IListing,
-  status: ListingModerationStatus
+  status: ListingModerationStatus,
 ): Promise<IListing> {
   return patchListing(listing.listingId, {
     moderationStatus: status,
@@ -33,7 +33,9 @@ export type ListingPatch = Partial<
     | "tags"
   >
 > & {
-  basicInformation?: Partial<IListing["basicInformation"]> & {
+  expectedRevision?: number;
+  correctionReason?: string;
+  basicInformation?: Partial<Omit<IListing["basicInformation"], "location">> & {
     location?: Partial<IListing["basicInformation"]["location"]>;
   };
   description?: Partial<IListing["description"]>;
@@ -42,9 +44,7 @@ export type ListingPatch = Partial<
   legalInformation?: Partial<IListing["legalInformation"]>;
   contactInformation?: {
     seller?: Partial<IListing["contactInformation"]["seller"]>;
-    biddingSupport?: Partial<
-      IListing["contactInformation"]["biddingSupport"]
-    >;
+    biddingSupport?: Partial<IListing["contactInformation"]["biddingSupport"]>;
   };
   additionalInformation?: Partial<IListing["additionalInformation"]>;
   tags?: Record<string, string>;
@@ -61,10 +61,13 @@ export type CreateListingInput = Omit<IListing, "listingId" | "ownerAccountId"> 
   ownerAccountId?: string;
 };
 
+export function fetchManagedListing(id: string): Promise<IListing> {
+  return request(`${BASE_URL}/listings/manage/${encodeURIComponent(id)}`);
+}
+
 export function fetchManagedListings(): Promise<IListing[]> {
   return request<IListing[]>(`${BASE_URL}/listings/manage`);
 }
-
 
 export function createListing(input: CreateListingInput): Promise<IListing> {
   return request<IListing>(`${BASE_URL}/listings`, {
@@ -118,7 +121,10 @@ export type ListingDraftReviewResult = {
   listing?: IListing | null;
 };
 
-export function approveListingDraft(draftId: string, expectedRevision?: number): Promise<ListingDraftReviewResult> {
+export function approveListingDraft(
+  draftId: string,
+  expectedRevision?: number,
+): Promise<ListingDraftReviewResult> {
   return request<ListingDraftReviewResult>(`${BASE_URL}/drafts/listings/${draftId}/approve`, {
     method: "POST",
     body: JSON.stringify({ expectedRevision }),
@@ -137,7 +143,11 @@ export function requestListingDraftChanges(
   });
 }
 
-export function rejectListingDraft(draftId: string, reason: string, expectedRevision?: number): Promise<ListingDraftReviewResult> {
+export function rejectListingDraft(
+  draftId: string,
+  reason: string,
+  expectedRevision?: number,
+): Promise<ListingDraftReviewResult> {
   return request<ListingDraftReviewResult>(`${BASE_URL}/drafts/listings/${draftId}/reject`, {
     method: "POST",
     body: JSON.stringify({ reason, expectedRevision }),

@@ -1,231 +1,240 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { IListing } from "../../interfaces/IListing";
-import { patchListing, publishListing } from "../listingApi";
-import { primaryBtn, secondaryBtn } from "../auctionDrawer/styles";
+import { fetchManagedListing, patchListing } from "../listingApi";
+import { ListingFormFields } from "./ListingFormFields";
 import {
-  ListingFormFields,
-  listingFormToPatch,
+  changedListingPatch,
   listingToForm,
-  type ListingFormState,
-} from "./ListingFormFields";
+  serverFormErrors,
+  validateForm,
+  type FormErrors,
+} from "./listingForm";
 
+type Failure = {
+  details?: {
+    fields?: Record<string, string>;
+    code?: string;
+    affectedAuctions?: { id: string; status: string }[];
+    changedFields?: string[];
+  };
+};
 export function ListingEditorSection({
   listing,
   onUpdated,
-  allowPublish = true,
   onDirtyChange,
 }: {
-  allowPublish?: boolean;
-  onDirtyChange?: (dirty: boolean) => void;
   listing: IListing;
   onUpdated: (listing: IListing) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  allowPublish?: boolean;
 }) {
-  const initialForm = useMemo(() => listingToForm(listing), [listing]);
-  const [form, setForm] = useState<ListingFormState>(initialForm);
-  const [saving, setSaving] = useState<"save" | "publish" | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
+  const [step, setStep] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [current, setCurrent] = useState(listing);
+  const [baseline, setBaseline] = useState(() => listingToForm(listing));
+  const [form, setForm] = useState(baseline);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [impact, setImpact] = useState<Failure["details"] | null>(null);
+  const [reason, setReason] = useState("");
+  const [conflict, setConflict] = useState(false);
+  const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
+  const notify = useRef(onDirtyChange);
+  notify.current = onDirtyChange;
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoaded(false);
+    try {
+      const data = await fetchManagedListing(listing.listingId);
+      setLoaded(true);
+      setCurrent(data);
+      const next = listingToForm(data);
+      setBaseline(next);
+      setForm(next);
+      setConflict(false);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load current property data.");
+    } finally {
+      setLoading(false);
+    }
+  }, [listing.listingId]);
   useEffect(() => {
-    setForm(initialForm);
-  }, [initialForm]);
-
-  const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
-
-  useEffect(() => { onDirtyChange?.(dirty); return () => onDirtyChange?.(false); }, [dirty, onDirtyChange]);
-
+    void load();
+  }, [load]);
   useEffect(() => {
-    if (!dirty) return;
-
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
+    notify.current?.(dirty || uploading || saving);
+    return () => notify.current?.(false);
+  }, [dirty, uploading, saving]);
+  useEffect(() => {
+    if (!dirty && !uploading && !saving) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
-
-  const save = async (shouldPublish: boolean) => {
-    setSaving(shouldPublish ? "publish" : "save");
-    setError(null);
-    setMessage(null);
-
-    try {
-      const updated = await patchListing(
-        listing.listingId,
-        listingFormToPatch(form),
+  }, [dirty, uploading, saving]);
+  async function save(confirmed = false) {
+    const validation = validateForm(form, false, baseline);
+    setErrors(validation);
+    setError("");
+    setMessage("");
+    if (Object.keys(validation).length) {
+      setError("Check the highlighted fields.");
+      setStep(
+        Object.keys(validation).some((key) =>
+          ["bedrooms", "bathrooms", "yearBuilt", "overview"].includes(key),
+        )
+          ? 1
+          : 0,
       );
-      const saved = shouldPublish
-        ? await publishListing(updated.listingId)
-        : updated;
-      onUpdated(saved);
-      setForm(listingToForm(saved));
-      setMessage(
-        shouldPublish
-          ? "Listing saved and published."
-          : "Listing changes saved.",
-      );
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to save listing.",
-      );
-    } finally {
-      setSaving(null);
+      return;
     }
-  };
-
+    setSaving(true);
+    try {
+      const next = await patchListing(current.listingId, {
+        ...changedListingPatch(form, baseline),
+        expectedRevision: current.revision,
+        ...(confirmed ? { correctionReason: reason } : {}),
+      });
+      setCurrent(next);
+      const saved = listingToForm(next);
+      setForm(saved);
+      setBaseline(saved);
+      setImpact(null);
+      setReason("");
+      onUpdated(next);
+      setMessage(
+        "Property changes saved. Seller submissions and approved snapshots are unchanged.",
+      );
+    } catch (e) {
+      const details = (e as Failure).details;
+      setErrors(serverFormErrors(details?.fields));
+      if (details?.code === "auction_correction_required") setImpact(details);
+      else {
+        setError(e instanceof Error ? e.message : "Save failed. Your changes are still here.");
+        setConflict(details?.code === "listing_conflict");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
   return (
-    <section style={styles.wrap}>
-      <div style={styles.header}>
-        <div>
-          <div style={styles.kicker}>Listing management</div>
-          <h3 style={styles.title}>Edit listing content</h3>
-          <p style={styles.muted}>
-            Update public property details, media, contacts, and map coordinates.
-          </p>
-        </div>
-        <div style={styles.statuses}>
-          <Status value={listing.moderationStatus ?? "pending"} />
-          <Status value={listing.workflowStatus ?? "draft"} />
-        </div>
-      </div>
-
-      <ListingFormFields form={form} setForm={setForm} />
-
-      {error ? <div style={styles.error}>{error}</div> : null}
-      {message ? <div style={styles.success}>{message}</div> : null}
-
-      <div style={styles.actions}>
-        {dirty ? <span style={styles.unsaved}>Unsaved listing changes</span> : null}
+    <section className="listing-editor-panel">
+      <header>
+        <p className="listing-eyebrow">Current operational listing</p>
+        <h3>Correct property information</h3>
+        <p className="listing-hint">
+          Changes update the current property record. Original seller submissions and approved
+          review snapshots remain unchanged.
+        </p>
+      </header>
+      {loading ? (
+        <p role="status">Loading current property data…</p>
+      ) : loaded ? (
+        <ListingFormFields
+          form={form}
+          setForm={setForm}
+          step={step}
+          onStepChange={setStep}
+          errors={errors}
+          onBusyChange={setUploading}
+          disabled={saving}
+        />
+      ) : (
+        <button type="button" onClick={() => void load()}>
+          Retry loading property
+        </button>
+      )}
+      {error ? (
+        <p className="listing-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {message && !dirty ? (
+        <p className="listing-success" role="status">
+          {message}
+        </p>
+      ) : null}
+      {conflict ? (
         <button
           type="button"
-          style={secondaryBtn}
           onClick={() => {
-            setForm(initialForm);
-            setError(null);
-            setMessage(null);
+            if (!dirty || window.confirm("Reload current data and discard your unsaved changes?"))
+              void load();
           }}
-          disabled={!dirty || Boolean(saving)}
         >
-          Reset
+          Reload current property
+        </button>
+      ) : null}
+      {impact ? (
+        <div className="listing-warning">
+          <h4>Review correction impact</h4>
+          <p>
+            This property has {impact.affectedAuctions?.map((a) => a.status).join(", ")} auctions.
+            Saving changes the current information bidders see; auction dates, bids and approved
+            terms are unchanged.
+          </p>
+          <p>
+            Verify the correction before proceeding. For changes that alter what is being sold,
+            pause or cancel the auction from Auction Management first.
+          </p>
+          <label>
+            Correction reason
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={1000} />
+          </label>
+          <button type="button" disabled={saving} onClick={() => setImpact(null)}>
+            Keep editing
+          </button>
+          <button
+            type="button"
+            disabled={saving || uploading || !reason.trim()}
+            onClick={() => void save(true)}
+          >
+            Confirm correction & save
+          </button>
+        </div>
+      ) : null}
+      <footer className="listing-editor__footer">
+        <span role="status">
+          {saving
+            ? "Saving…"
+            : uploading
+              ? "Uploading photos…"
+              : dirty
+                ? "Unsaved property changes"
+                : message
+                  ? "Saved"
+                  : "No unsaved changes"}
+        </span>
+        <button
+          type="button"
+          disabled={!dirty || saving || uploading || loading}
+          onClick={() => {
+            setForm(baseline);
+            setImpact(null);
+            setErrors({});
+            setError("");
+          }}
+        >
+          Reset changes
         </button>
         <button
           type="button"
-          style={secondaryBtn}
-          onClick={() => void save(false)}
-          disabled={!dirty || Boolean(saving)}
+          className="listing-primary"
+          disabled={
+            !dirty || saving || uploading || loading || !loaded || conflict || Boolean(impact)
+          }
+          onClick={() => void save()}
         >
-          {saving === "save" ? "Saving..." : "Save Listing"}
+          {saving ? "Saving…" : "Save property changes"}
         </button>
-        {allowPublish ? <button
-          type="button"
-          style={primaryBtn}
-          onClick={() => void save(true)}
-          disabled={Boolean(saving)}
-        >
-          {saving === "publish"
-            ? "Publishing..."
-            : listing.workflowStatus === "published"
-              ? "Publish Updates"
-              : "Save & Publish"}
-        </button> : null}
-      </div>
+      </footer>
     </section>
   );
 }
-
-function Status({ value }: { value: string }) {
-  return <span style={styles.status}>{value.replace(/_/g, " ")}</span>;
-}
-
-const styles: Record<string, CSSProperties> = {
-  wrap: {
-    marginTop: 12,
-    border: "1px solid var(--dash-border)",
-    borderRadius: 8,
-    padding: 18,
-    background: "var(--dash-card)",
-  },
-  header: {
-    marginBottom: 22,
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 18,
-  },
-  kicker: {
-    color: "var(--dash-muted)",
-    fontSize: 11,
-    fontWeight: 800,
-    textTransform: "uppercase",
-  },
-  title: {
-    margin: "4px 0 5px",
-    color: "var(--dash-ink)",
-    fontFamily: "var(--dash-font-display)",
-    fontSize: 24,
-    fontWeight: 600,
-    letterSpacing: 0,
-  },
-  muted: {
-    margin: 0,
-    color: "var(--dash-muted)",
-    fontSize: 12,
-  },
-  statuses: {
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-    gap: 6,
-  },
-  status: {
-    border: "1px solid var(--dash-border)",
-    borderRadius: 999,
-    padding: "5px 9px",
-    background: "var(--dash-surface)",
-    color: "var(--dash-muted)",
-    fontSize: 11,
-    fontWeight: 750,
-    textTransform: "capitalize",
-  },
-  actions: {
-    position: "sticky",
-    bottom: 0,
-    zIndex: 2,
-    margin: "24px -18px -18px",
-    padding: 14,
-    borderTop: "1px solid var(--dash-border)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: 8,
-    background: "color-mix(in srgb, var(--dash-card) 94%, transparent)",
-    backdropFilter: "blur(12px)",
-  },
-  unsaved: {
-    marginRight: "auto",
-    color: "var(--dash-warning)",
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  error: {
-    marginTop: 14,
-    padding: 10,
-    borderRadius: 6,
-    background: "rgba(178, 67, 67, 0.1)",
-    color: "var(--dash-danger)",
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  success: {
-    marginTop: 14,
-    padding: 10,
-    borderRadius: 6,
-    background: "rgba(63, 127, 95, 0.1)",
-    color: "var(--dash-success)",
-    fontSize: 12,
-    fontWeight: 700,
-  },
-};

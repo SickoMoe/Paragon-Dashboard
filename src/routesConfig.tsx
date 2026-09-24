@@ -1,3 +1,4 @@
+import TransactionsPage, { TransactionWorkspace } from "./features/transactions/TransactionsPage";
 import GenericRouteConfig from "./interfaces/iGenericRouteConfig";
 import DashboardLayout from "./routes/dashboard/layout";
 import SiteContentPage from "./features/siteContent";
@@ -15,6 +16,8 @@ export const routesConfig: GenericRouteConfig[] = [
   element: <DashboardLayout />, // navbar + shell
   children: [
     auctionRoute,
+    { path: "transactions", element: <TransactionsPage /> },
+    { path: "transactions/:transactionId", element: <TransactionWorkspace /> },
     messageRoute,
     { path: "users", element: <UsersPage /> },
     { path: "website", element: <SiteContentPage /> },

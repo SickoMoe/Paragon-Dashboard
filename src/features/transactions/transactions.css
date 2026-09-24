@@ -1,0 +1,242 @@
+.transactions {
+  color: var(--text-primary, #282e2a);
+  padding: 24px;
+  max-width: 1160px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+.transactions h1,
+.transactions h2,
+.transactions h3 {
+  font-family: var(--font-display, Georgia, serif);
+  font-weight: 500;
+}
+.transactions h1 {
+  font-size: 32px;
+  margin: 10px 0;
+}
+.transactions h2 {
+  font-size: 23px;
+}
+.transactions a {
+  color: inherit;
+}
+.transaction-toolbar,
+.transaction-tabs,
+.transaction-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.transactions button,
+.transactions select,
+.transactions input,
+.transactions textarea {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid #dce1dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #29352e;
+  box-sizing: border-box;
+}
+.transactions button {
+  cursor: pointer;
+}
+.transactions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.transactions button[aria-current],
+.transactions .transaction-primary {
+  background: #344e3d;
+  color: #fff;
+  border-color: #344e3d;
+}
+.transactions label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.transactions textarea {
+  min-height: 100px;
+  width: 100%;
+}
+.transactions fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.transactions [role="alert"] {
+  background: #fff0ed;
+  border: 1px solid #e8b5ab;
+  color: #8b3225;
+  border-radius: 8px;
+  padding: 12px;
+}
+.transaction-card,
+.transaction-panel {
+  border: 1px solid #e2e5e1;
+  border-radius: 12px;
+  background: #fff;
+  padding: 20px;
+  margin: 16px 0;
+}
+.transaction-card {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 20px;
+  align-items: center;
+}
+.transaction-card img {
+  width: 120px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.transaction-card h2 {
+  margin: 0 0 6px;
+}
+.transaction-card p {
+  margin: 5px 0;
+  color: #69736b;
+}
+.transaction-status {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: #edf2eb;
+  color: #35513d;
+  font-size: 12px;
+  font-weight: 600;
+}
+.transaction-next {
+  background: #f1f5ef;
+  border-left: 3px solid #637e60;
+  padding: 18px;
+  border-radius: 6px;
+  margin: 20px 0;
+}
+.transaction-next p {
+  margin: 4px 0;
+}
+.transaction-milestones {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  list-style: none;
+  padding: 0;
+  gap: 10px;
+}
+.transaction-milestones li {
+  padding: 12px;
+  border-top: 3px solid #dfe5de;
+  font-size: 13px;
+}
+.transaction-milestones li.is-complete {
+  border-color: #4b7355;
+}
+.transaction-milestones small {
+  display: block;
+  color: #6c746d;
+  margin-top: 5px;
+}
+.transaction-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.transaction-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 16px 0;
+}
+.transaction-facts dt {
+  font-size: 12px;
+  color: #6c746d;
+}
+.transaction-facts dd {
+  margin: 4px 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.transaction-timeline {
+  list-style: none;
+  padding: 0;
+}
+.transaction-timeline li {
+  padding: 14px 0;
+  border-bottom: 1px solid #e8ebe7;
+}
+.transaction-timeline small,
+.transaction-muted {
+  color: #6c746d;
+  font-size: 12px;
+}
+.transaction-timeline p {
+  margin: 5px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.transaction-document {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #e8ebe7;
+  padding: 14px 0;
+}
+.transaction-document strong {
+  overflow-wrap: anywhere;
+}
+.transaction-document small {
+  display: block;
+  color: #6c746d;
+}
+.transaction-notes p {
+  white-space: pre-wrap;
+}
+.transaction-link {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 600;
+}
+.transaction-warning {
+  background: #fff4e4;
+  padding: 14px;
+  border-radius: 8px;
+}
+.transactions input:focus-visible,
+.transactions button:focus-visible,
+.transactions textarea:focus-visible,
+.transactions a:focus-visible {
+  outline: 2px solid #60795d;
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  .transactions {
+    padding: 16px;
+  }
+  .transaction-card {
+    grid-template-columns: 1fr;
+  }
+  .transaction-card img {
+    width: 100%;
+    height: 180px;
+  }
+  .transaction-grid,
+  .transaction-facts {
+    grid-template-columns: 1fr;
+  }
+  .transaction-milestones {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .transaction-document {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

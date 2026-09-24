@@ -1,5 +1,5 @@
 // routes/auctions/AuctionOverviewRoute.tsx
-import { Navigate, useNavigate, useParams, useRevalidator } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useRevalidator } from "react-router-dom";
 import { useDashboardPageContext } from "../../routes/auctions/auctionPageContext";
 import { AuctionOverviewPanel } from "./AuctionOverviewPanel";
 import { useAuctionDrawerController } from "../auctions/hooks/useAuctionDrawerController";
@@ -46,6 +46,8 @@ function AuctionOverviewRouteContent({
   );
 
   return (
+    <>
+    {["ended", "archived"].includes(row.auction.status) ? <p style={{ padding: "0 20px" }}><Link to={`/transactions?auction=${encodeURIComponent(row.auction.id)}`}>View transaction and closing →</Link></p> : null}
     <AuctionOverviewPanel
       row={row}
       loading={ctrl.loading}
@@ -66,5 +68,6 @@ function AuctionOverviewRouteContent({
       onRelist={ctrl.handleRelist}
       onDelete={ctrl.handleDeleteClick}
     />
+    </>
   );
 }

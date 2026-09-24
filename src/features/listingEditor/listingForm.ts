@@ -9,6 +9,7 @@ export type ListingFormState = {
   zipcode: string;
   latitude: string;
   longitude: string;
+  coordinateSource?: "manual" | "geocoded";
   overview: string;
   detailedDescription: string;
   thumbnailUrl: string;
@@ -75,6 +76,7 @@ export function listingToForm(listing: IListing): ListingFormState {
     zipcode: location.zipcode ?? "",
     latitude: formatCoordinate(location.latitude),
     longitude: formatCoordinate(location.longitude),
+    coordinateSource: location.coordinateSource,
     overview: listing.description?.overview ?? "",
     detailedDescription: listing.description?.detailedDescription ?? "",
     thumbnailUrl: listing.media?.thumbnailUrl ?? "",
@@ -112,6 +114,7 @@ export function listingFormToPatch(form: ListingFormState): ListingPatch {
         zipcode: form.zipcode.trim(),
         latitude: optionalNumber(form.latitude) as number,
         longitude: optionalNumber(form.longitude) as number,
+        coordinateSource: form.latitude && form.longitude ? form.coordinateSource : undefined,
       },
     },
     description: {
@@ -204,7 +207,21 @@ export function changedListingPatch(
     }
     return changed;
   }
-  return diff(listingFormToPatch(form), listingFormToPatch(original));
+  const patch = diff(listingFormToPatch(form), listingFormToPatch(original));
+  // Explicitly preserve the confirmed pin for address corrections, including legacy pins.
+  if (
+    patch.basicInformation?.location &&
+    ["address", "city", "state", "zipcode"].some((key) => key in patch.basicInformation.location) &&
+    form.latitude &&
+    form.longitude
+  ) {
+    Object.assign(patch.basicInformation.location, {
+      latitude: Number(form.latitude),
+      longitude: Number(form.longitude),
+      coordinateSource: form.coordinateSource,
+    });
+  }
+  return patch;
 }
 export const listingSteps = ["Property", "Details", "Photos", "Seller / legal", "Terms & review"];
 export type FormErrors = Partial<Record<keyof ListingFormState, string>>;

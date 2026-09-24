@@ -36,6 +36,13 @@ const listing = () =>
     tags: { custom: "Stay" },
   }) as IListing;
 beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   vi.clearAllMocks();
   localStorage.clear();
   vi.mocked(request).mockResolvedValue(listing());
@@ -82,6 +89,7 @@ it("keeps failed edits, retries the minimal patch, and reports the saved state",
   });
   const update = vi.fn();
   render(<ListingEditorSection listing={listing()} onUpdated={update} />);
+  fireEvent.click(await screen.findByText("Edit address details"));
   fireEvent.change(await screen.findByRole("textbox", { name: "Street address" }), {
     target: { value: "2 Oak Ave" },
   });
@@ -93,7 +101,7 @@ it("keeps failed edits, retries the minimal patch, and reports the saved state",
   const call = vi.mocked(request).mock.calls.find(([, init]) => init?.method === "PATCH");
   expect(JSON.parse(String(call?.[1]?.body))).toEqual({
     expectedRevision: 3,
-    basicInformation: { location: { address: "2 Oak Ave", latitude: null, longitude: null } },
+    basicInformation: { location: { address: "2 Oak Ave", latitude: 30, longitude: -97 } },
   });
   expect(screen.getByText("Saved", { exact: true })).toBeInTheDocument();
 });
@@ -201,7 +209,7 @@ function Address() {
     </>
   );
 }
-it("populates a selected address and clears stale fields without assigning an area marker", async () => {
+it("keeps a property address intact when a suggestion only identifies an area", async () => {
   vi.mocked(request).mockResolvedValue({
     matches: [
       {
@@ -215,15 +223,15 @@ it("populates a selected address and clears stale fields without assigning an ar
     ],
   });
   render(<Address />);
-  fireEvent.click(screen.getByRole("button", { name: "Find coordinates for entered address" }));
+  fireEvent.click(screen.getByRole("button", { name: "Find automatically again" }));
   fireEvent.click(await screen.findByRole("button", { name: /Houston, TX/ }));
   expect(JSON.parse(screen.getByTestId("form").textContent!)).toMatchObject({
-    address: "",
-    city: "Houston",
+    address: "1 Oak Ave",
+    city: "Austin",
     state: "TX",
-    zipcode: "",
-    latitude: "",
-    longitude: "",
+    zipcode: "78701",
+    latitude: "30",
+    longitude: "-97",
   });
-  expect(screen.getByText(/no map pin was assigned/)).toBeInTheDocument();
+  expect(screen.getByText(/This identifies an area, not the property/)).toBeInTheDocument();
 });

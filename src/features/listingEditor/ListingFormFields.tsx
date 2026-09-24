@@ -34,9 +34,6 @@ export function ListingFormFields({
     setForm((f) => ({
       ...f,
       [key]: value,
-      ...(["address", "city", "state", "zipcode"].includes(key)
-        ? { latitude: "", longitude: "" }
-        : {}),
     }));
   const live = validateForm(form);
   const message = (key: keyof ListingFormState) =>
@@ -121,30 +118,19 @@ export function ListingFormFields({
                 </select>
               </Field>
             </div>
-            <AddressSearch form={form} setForm={setForm} disabled={disabled} />
-            {field("address", "Street address", { required: true })}
-            <div className="listing-grid">
-              {field("city", "City", { required: true })}
-              {field("state", "State", { required: true })}
-              {field("zipcode", "ZIP code", { required: true })}
-            </div>
-            <p className="listing-hint">
-              Changing the address clears the old map pin. Use address search or “Find coordinates”
-              to select the corrected location.
-            </p>
-            <details open={Boolean(message("latitude") || message("longitude")) || undefined}>
-              <summary>Advanced: correct map coordinates</summary>
-              <div className="listing-grid">
-                {field("latitude", "Latitude", { number: true })}
-                {field("longitude", "Longitude", { number: true })}
-              </div>
-              <button
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, latitude: "", longitude: "" }))}
-              >
-                Clear map coordinates
-              </button>
-            </details>
+            <AddressSearch
+              form={form}
+              setForm={setForm}
+              disabled={disabled}
+              errors={{
+                address: message("address"),
+                city: message("city"),
+                state: message("state"),
+                zipcode: message("zipcode"),
+                latitude: message("latitude"),
+                longitude: message("longitude"),
+              }}
+            />
           </>
         ) : null}
         {step === 1 ? (

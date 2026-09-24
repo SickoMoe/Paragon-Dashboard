@@ -17,6 +17,7 @@ export interface IListing {
       zipcode: string;
       latitude?: number;
       longitude?: number;
+      coordinateSource?: "geocoded" | "manual";
     };
   };
   description: {

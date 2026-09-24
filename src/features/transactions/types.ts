@@ -55,6 +55,11 @@ export type Transaction = {
   };
   buyer?: { name: string; accountId: string; email: string };
   seller?: { name: string; accountId: string; email: string };
+  management?: {
+    correctionFields: string[];
+    canReopen: boolean;
+    reopenBlockedReason: string | null;
+  };
   resultCorrections?: { at: string; reason: string }[];
   notes: { noteId: string; at: string; text: string; visibility: string; actor: string }[];
   documents: TransactionDocument[];
@@ -62,6 +67,7 @@ export type Transaction = {
     eventId: string;
     at: string;
     actor: string;
+    actorAccountId?: string;
     type: string;
     visibility: string;
     details: Record<string, unknown>;

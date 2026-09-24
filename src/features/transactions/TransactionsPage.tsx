@@ -1,3 +1,4 @@
+import { CorrectRecordForm, ReopenTransactionForm } from "./TerminalTransactionForms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { request } from "../../core/api/request";
@@ -131,6 +132,7 @@ export function TransactionWorkspace() {
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [section, setSection] = useState("overview"),
+    [advancedMode, setAdvancedMode] = useState("record"),
     [dirty, setDirty] = useState(false);
   const url = base + "/" + encodeURIComponent(transactionId || "");
   const load = useCallback(async () => {
@@ -168,7 +170,13 @@ export function TransactionWorkspace() {
         }),
       );
       setDirty(false);
-      setNotice("Saved. Participants can see the updated closing progress.");
+      setNotice(
+        path === "/reopen"
+          ? "Transaction reopened. Participants have been notified."
+          : path === "/corrections"
+            ? "Record corrected. The terminal status is unchanged."
+            : "Saved. Participant-visible information is updated; internal details stay private.",
+      );
       return true;
     } catch (e) {
       setError((e as Error).message);
@@ -244,14 +252,14 @@ export function TransactionWorkspace() {
             <p>{t.nextAction}</p>
           </div>
           <nav className="transaction-tabs" aria-label="Closing sections">
-            {["overview", "agreement", "deposit", "closing", "timeline"].map((s) => (
+            {["overview", "agreement", "deposit", "closing", "timeline", "advanced"].map((s) => (
               <button
                 key={s}
                 disabled={busy}
                 aria-current={section === s ? "page" : undefined}
                 onClick={() => changeSection(s)}
               >
-                {label(s)}
+                {s === "advanced" ? "Advanced transaction management" : label(s)}
               </button>
             ))}
           </nav>
@@ -301,39 +309,162 @@ export function TransactionWorkspace() {
                     select a replacement buyer.
                   </p>
                 </details>
-                {t.resultCorrections?.length ? (
-                  <p className="transaction-warning">
-                    Result invalidated: {t.resultCorrections[0].reason}
-                  </p>
-                ) : (
-                  <ResultCorrection
-                    busy={busy}
-                    save={(body) => action("/result-correction", body)}
-                  />
-                )}
               </>
             ) : null}
-            {["agreement", "deposit", "closing"].includes(section) ? (
+            {["agreement", "deposit", "closing"].includes(section) && !terminal(t) ? (
               <MilestoneForm
                 key={`${t.revision}:${section}`}
                 t={t}
                 section={section}
                 busy={busy}
                 dirty={setDirty}
-                save={(body, correction) =>
-                  action(correction ? "/corrections" : "", body, correction ? "POST" : "PATCH")
-                }
+                save={(body) => action("", body, "PATCH")}
               />
+            ) : null}
+            {["agreement", "deposit", "closing"].includes(section) && terminal(t) ? (
+              <>
+                <h2>{label(section)}</h2>
+                <p>
+                  This transaction is {label(t.status).toLowerCase()} and locked. Use Advanced
+                  transaction management for factual corrections or an explicit reopening.
+                </p>
+                <dl className="transaction-facts">
+                  <Fact title="Agreement" value={label(t.agreementStatus)} />
+                  <Fact title="Deposit" value={label(t.depositStatus)} />
+                  <Fact title="Closing" value={label(t.closingStatus)} />
+                  <Fact title="Signing deadline" value={when(t.agreementDueAt)} />
+                  <Fact title="Deposit amount" value={money(t.depositAmount, t.currency)} />
+                  <Fact title="Deposit received" value={when(t.depositReceivedAt)} />
+                  <Fact title="Deposit deadline" value={when(t.depositDueAt)} />
+                  <Fact title="Closing date" value={when(t.closingDate)} />
+                  <Fact title="Completed" value={when(t.completedAt)} />
+                </dl>
+                {t.terminationReason ? <p>{t.terminationReason}</p> : null}
+                <h3>Documents</h3>
+                {t.documents.map((d) => (
+                  <div className="transaction-document" key={d.documentId}>
+                    <span>
+                      {d.filename} · {label(d.visibility)}
+                    </span>
+                    <button disabled={busy} onClick={() => void download(d)}>
+                      Download
+                    </button>
+                  </div>
+                ))}
+              </>
+            ) : null}
+            {section === "advanced" ? (
+              <>
+                <h2>Advanced transaction management</h2>
+                <p>
+                  Correct record fixes historical facts without restarting closing. Reopen
+                  transaction deliberately resumes an active workflow. Invalidating the auction
+                  result fails the transaction permanently and prevents normal reopening.
+                </p>
+                <div className="transaction-actions">
+                  {(terminal(t)
+                    ? [
+                        "record",
+                        "notes",
+                        "documents",
+                        ...(t.management?.canReopen && !t.resultCorrections?.length
+                          ? ["reopen"]
+                          : []),
+                        "invalidate",
+                      ]
+                    : ["invalidate"]
+                  ).map((mode) => (
+                    <button
+                      key={mode}
+                      disabled={busy}
+                      aria-current={advancedMode === mode ? "page" : undefined}
+                      onClick={() => {
+                        if (
+                          dirty &&
+                          !window.confirm("Discard unsaved changes before switching actions?")
+                        )
+                          return;
+                        setDirty(false);
+                        setAdvancedMode(mode);
+                      }}
+                    >
+                      {
+                        (
+                          {
+                            record: "Correct record",
+                            notes: "Correct record: add note",
+                            documents: "Correct record: documents",
+                            reopen: "Reopen transaction",
+                            invalidate: "Invalidate auction result",
+                          } as Record<string, string>
+                        )[mode]
+                      }
+                    </button>
+                  ))}
+                </div>
+                {t.management?.reopenBlockedReason ? (
+                  <p className="transaction-warning">
+                    Reopening unavailable: {t.management.reopenBlockedReason}
+                  </p>
+                ) : null}
+                {terminal(t) && advancedMode === "record" ? (
+                  <CorrectRecordForm
+                    key={t.revision}
+                    t={t}
+                    busy={busy}
+                    dirty={setDirty}
+                    save={(body) => action("/corrections", body)}
+                  />
+                ) : null}
+                {terminal(t) && advancedMode === "notes" ? (
+                  <NoteForm
+                    key={t.revision}
+                    terminalRecord
+                    busy={busy}
+                    dirty={setDirty}
+                    save={(body) => action("/notes", body)}
+                  />
+                ) : null}
+                {terminal(t) &&
+                advancedMode === "reopen" &&
+                t.management?.canReopen &&
+                !t.resultCorrections?.length ? (
+                  <ReopenTransactionForm
+                    key={t.revision}
+                    t={t}
+                    busy={busy}
+                    dirty={setDirty}
+                    save={(body) => action("/reopen", body)}
+                  />
+                ) : null}
+                {!terminal(t) || advancedMode === "invalidate" ? (
+                  t.resultCorrections?.length ? (
+                    <p className="transaction-warning">
+                      Result invalidated: {t.resultCorrections[0].reason}. The original bid, buyer
+                      and winning amount are preserved.
+                    </p>
+                  ) : (
+                    <ResultCorrection
+                      busy={busy}
+                      save={(body) => action("/result-correction", body)}
+                    />
+                  )
+                ) : null}
+              </>
             ) : null}
             {section === "timeline" ? (
               <>
                 <h2>History & notes</h2>
-                <NoteForm
-                  key={t.revision}
-                  busy={busy}
-                  dirty={setDirty}
-                  save={(body) => action("/notes", body)}
-                />
+                {!terminal(t) ? (
+                  <NoteForm
+                    key={t.revision}
+                    busy={busy}
+                    dirty={setDirty}
+                    save={(body) => action("/notes", body)}
+                  />
+                ) : (
+                  <p>Use Advanced transaction management to add a correction note.</p>
+                )}
                 <ol className="transaction-timeline">
                   {[...t.timeline].reverse().map((e) => (
                     <li key={e.eventId}>
@@ -344,6 +475,7 @@ export function TransactionWorkspace() {
                       <br />
                       <small>
                         {when(e.at)} · {e.actor}
+                        {e.actorAccountId ? ` (${e.actorAccountId})` : ""}
                       </small>
                       {typeof e.details.text === "string" ? <p>{e.details.text}</p> : null}
                       {typeof e.details.reason === "string" ? <p>{e.details.reason}</p> : null}
@@ -368,7 +500,8 @@ export function TransactionWorkspace() {
               </>
             ) : null}
           </section>
-          {["agreement", "deposit", "closing"].includes(section) ? (
+          {(!terminal(t) && ["agreement", "deposit", "closing"].includes(section)) ||
+          (terminal(t) && section === "advanced" && advancedMode === "documents") ? (
             <DocumentManager
               key={`${t.revision}:${section}`}
               t={t}
@@ -411,7 +544,7 @@ function MilestoneForm({
   section: string;
   busy: boolean;
   dirty: (v: boolean) => void;
-  save: (body: object, correction: boolean) => Promise<boolean>;
+  save: (body: object) => Promise<boolean>;
 }) {
   const [agreement, setAgreement] = useState(t.agreementStatus),
     [agreementDue, setAgreementDue] = useState(localDate(t.agreementDueAt)),
@@ -421,10 +554,7 @@ function MilestoneForm({
     [received, setReceived] = useState(localDate(t.depositReceivedAt)),
     [closing, setClosing] = useState(t.closingStatus),
     [closingDate, setClosingDate] = useState(localDate(t.closingDate)),
-    [reason, setReason] = useState(""),
-    [correction, setCorrection] = useState(false),
-    [correctionReason, setCorrectionReason] = useState("");
-  const locked = terminal(t) && !correction;
+    [reason, setReason] = useState("");
   const iso = (v: string) => (v ? new Date(v).toISOString() : null);
   const body = () => ({
     ...(section === "agreement"
@@ -438,51 +568,18 @@ function MilestoneForm({
             reason,
           }
         : { closingStatus: closing, closingDate: iso(closingDate) }),
-    ...(correction
-      ? { correctionReason, status: t.status === "completed" ? "completed" : "active" }
-      : {}),
   });
   return (
     <>
       <h2>{label(section)}</h2>
-      {terminal(t) ? (
-        <div className="transaction-warning">
-          <p>
-            This transaction is locked. Operational corrections require a reason and remain in the
-            audit history.
-          </p>
-          <label>
-            <span>
-              <input
-                type="checkbox"
-                checked={correction}
-                onChange={(e) => setCorrection(e.target.checked)}
-              />{" "}
-              Make an admin correction
-            </span>
-          </label>
-          {correction ? (
-            <label>
-              Correction reason
-              <textarea
-                value={correctionReason}
-                onChange={(e) => {
-                  setCorrectionReason(e.target.value);
-                  dirty(true);
-                }}
-              />
-            </label>
-          ) : null}
-        </div>
-      ) : null}
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void save(body(), correction);
+          void save(body());
         }}
         onChange={() => dirty(true)}
       >
-        <fieldset disabled={busy || locked}>
+        <fieldset disabled={busy}>
           <div className="transaction-grid">
             {section === "agreement" ? (
               <>
@@ -582,28 +679,16 @@ function MilestoneForm({
                 ? "Record deposits after confirming receipt outside Paragon. A signed agreement is required."
                 : "Closing requires a signed agreement and a received or waived deposit."}
           </p>
-          <button
-            className="transaction-primary"
-            disabled={busy || locked || (correction && !correctionReason.trim())}
-          >
+          <button className="transaction-primary" disabled={busy}>
             {busy ? "Saving…" : `Save ${section}`}
           </button>
         </fieldset>
       </form>
-      {section === "closing" && !locked ? (
+      {section === "closing" ? (
         <div className="transaction-actions">
           <button
-            disabled={
-              busy ||
-              t.closingStatus !== "completed" ||
-              Boolean(correction && !correctionReason.trim())
-            }
-            onClick={() =>
-              void save(
-                { status: "completed", ...(correction ? { correctionReason } : {}) },
-                correction,
-              )
-            }
+            disabled={busy || t.closingStatus !== "completed"}
+            onClick={() => void save({ status: "completed" })}
           >
             Complete transaction
           </button>
@@ -626,13 +711,13 @@ function MilestoneForm({
           <div className="transaction-actions">
             <button
               disabled={busy || !reason.trim()}
-              onClick={() => void save({ status: "cancelled", reason }, false)}
+              onClick={() => void save({ status: "cancelled", reason })}
             >
               Cancel transaction
             </button>
             <button
               disabled={busy || !reason.trim()}
-              onClick={() => void save({ status: "failed", reason }, false)}
+              onClick={() => void save({ status: "failed", reason })}
             >
               Fail transaction
             </button>
@@ -643,6 +728,7 @@ function MilestoneForm({
   );
 }
 function NoteForm({
+  terminalRecord = false,
   busy,
   dirty,
   save,
@@ -650,14 +736,16 @@ function NoteForm({
   busy: boolean;
   dirty: (v: boolean) => void;
   save: (v: object) => Promise<boolean>;
+  terminalRecord?: boolean;
 }) {
+  const [correctionReason, setCorrectionReason] = useState("");
   const [text, setText] = useState(""),
     [visibility, setVisibility] = useState("participants");
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        void save({ text, visibility });
+        void save({ text, visibility, ...(terminalRecord ? { correctionReason } : {}) });
       }}
     >
       <fieldset disabled={busy}>
@@ -681,7 +769,23 @@ function NoteForm({
               <option value="internal">Team only</option>
             </select>
           </label>
-          <button disabled={!text.trim() || busy}>Add note</button>
+          {terminalRecord ? (
+            <label>
+              Correction reason (internal)
+              <textarea
+                required
+                maxLength={4000}
+                value={correctionReason}
+                onChange={(e) => {
+                  setCorrectionReason(e.target.value);
+                  dirty(true);
+                }}
+              />
+            </label>
+          ) : null}
+          <button disabled={!text.trim() || busy || (terminalRecord && !correctionReason.trim())}>
+            Add note
+          </button>
         </div>
       </fieldset>
     </form>

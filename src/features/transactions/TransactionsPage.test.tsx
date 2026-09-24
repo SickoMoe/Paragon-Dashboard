@@ -97,7 +97,9 @@ it("preserves a rejected milestone edit and retries with the loaded revision", a
   expect(await screen.findByRole("alert")).toHaveTextContent("Upload an agreement first");
   expect(screen.getByLabelText("Agreement status")).toHaveValue("ready");
   fireEvent.click(screen.getByRole("button", { name: "Save agreement" }));
-  await screen.findByText("Saved. Participants can see the updated closing progress.");
+  await screen.findByText(
+    "Saved. Participant-visible information is updated; internal details stay private.",
+  );
   const writes = vi.mocked(request).mock.calls.filter(([, init]) => init?.method === "PATCH");
   expect(writes).toHaveLength(2);
   expect(JSON.parse(writes[1][1]!.body as string)).toEqual({
@@ -114,24 +116,6 @@ it("cannot complete until the saved closing milestone is complete", async () => 
   expect(screen.getByRole("button", { name: "Complete transaction" })).toBeDisabled();
   fireEvent.change(screen.getByLabelText("Closing status"), { target: { value: "completed" } });
   expect(screen.getByRole("button", { name: "Complete transaction" })).toBeDisabled();
-});
-it("requires a correction reason to edit a completed transaction", async () => {
-  vi.mocked(request).mockResolvedValue({
-    ...fixture(),
-    status: "completed",
-    closingStatus: "completed",
-    locked: true,
-  });
-  workspace();
-  await screen.findByText("Finalized auction result");
-  fireEvent.click(screen.getByRole("button", { name: "Closing" }));
-  expect(screen.getByRole("button", { name: "Save closing" })).toBeDisabled();
-  fireEvent.click(screen.getByLabelText("Make an admin correction"));
-  expect(screen.getByRole("button", { name: "Save closing" })).toBeDisabled();
-  fireEvent.change(screen.getByLabelText("Correction reason"), {
-    target: { value: "Correct recorded date" },
-  });
-  expect(screen.getByRole("button", { name: "Save closing" })).not.toBeDisabled();
 });
 it("recovers an unavailable detail page using refresh", async () => {
   vi.mocked(request)
@@ -158,4 +142,130 @@ it("lists real managed transactions and forwards the auction filter", async () =
     "href",
     "/transactions/closing-1",
   );
+});
+
+function terminalFixture(status = "completed"): Transaction {
+  return {
+    ...fixture(),
+    status,
+    agreementStatus: status === "completed" ? "signed" : "void",
+    depositStatus: "received",
+    depositAmount: 25000,
+    depositReceivedAt: "2026-09-19T17:00:00Z",
+    closingStatus: status === "completed" ? "completed" : "cancelled",
+    closingDate: "2026-09-20T17:00:00Z",
+    completedAt: status === "completed" ? "2026-09-20T18:00:00Z" : null,
+    locked: true,
+    management: {
+      correctionFields: ["closingDate", "depositReceivedAt", "depositAmount"],
+      canReopen: true,
+      reopenBlockedReason: null,
+    },
+    documents: [
+      {
+        documentId: "doc-1",
+        filename: "Agreement.pdf",
+        category: "purchase_agreement",
+        visibility: "participants",
+        contentType: "application/pdf",
+        size: 100,
+        uploadedAt: "2026-09-01",
+      },
+    ],
+  };
+}
+it.each(["completed", "cancelled", "failed"])(
+  "keeps %s milestone panels read-only and offers valid record corrections under Advanced",
+  async (status) => {
+    vi.mocked(request).mockResolvedValue(terminalFixture(status));
+    workspace();
+    await screen.findByText("Finalized auction result");
+    fireEvent.click(screen.getByRole("button", { name: "Closing" }));
+    expect(screen.queryByRole("button", { name: "Save closing" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Make an admin correction")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Closing status")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Advanced transaction management" }));
+    expect(screen.getByRole("heading", { name: "Correct record" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save record correction" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Corrected value"), {
+      target: { value: "2026-09-19T12:00" },
+    });
+    fireEvent.change(screen.getByLabelText("Correction reason"), {
+      target: { value: "Correct recorded date" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save record correction" }));
+    await screen.findByText("Record corrected. The terminal status is unchanged.");
+    const call = vi.mocked(request).mock.calls.find(([url]) => url.endsWith("/corrections"))!;
+    const body = JSON.parse(call[1]!.body as string);
+    expect(body).toMatchObject({ revision: 3, correctionReason: "Correct recorded date" });
+    expect(body).not.toHaveProperty("status");
+    expect(body).not.toHaveProperty("closingStatus");
+  },
+);
+it("requires a deliberate resume point, reason and confirmation before one reopen request", async () => {
+  vi.mocked(request).mockResolvedValue(terminalFixture("cancelled"));
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  workspace();
+  await screen.findByText("Finalized auction result");
+  fireEvent.click(screen.getByRole("button", { name: "Advanced transaction management" }));
+  fireEvent.click(screen.getByRole("button", { name: "Reopen transaction" }));
+  expect(screen.getByLabelText("Resume point")).toHaveValue("");
+  const submit = screen.getAllByRole("button", { name: "Reopen transaction" }).slice(-1)[0]!;
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("Resume point"), {
+    target: { value: "pending_agreement" },
+  });
+  fireEvent.change(screen.getByLabelText("Reopening reason"), {
+    target: { value: "Resume after review" },
+  });
+  fireEvent.click(submit);
+  expect(vi.mocked(request).mock.calls.some(([url]) => url.endsWith("/reopen"))).toBe(false);
+  confirm.mockReturnValue(true);
+  fireEvent.click(submit);
+  await screen.findByText("Transaction reopened. Participants have been notified.");
+  const calls = vi.mocked(request).mock.calls.filter(([url]) => url.endsWith("/reopen"));
+  expect(calls).toHaveLength(1);
+  expect(JSON.parse(calls[0][1]!.body as string)).toEqual({
+    revision: 3,
+    targetStatus: "pending_agreement",
+    reason: "Resume after review",
+    confirmed: true,
+  });
+  confirm.mockRestore();
+});
+it("keeps a failed reopen form intact so an admin can correct it and retry", async () => {
+  vi.mocked(request).mockImplementation(async (url) => {
+    if (url.endsWith("/reopen"))
+      throw new Error("This transaction changed. Refresh before saving.");
+    return terminalFixture("failed");
+  });
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  workspace();
+  await screen.findByText("Finalized auction result");
+  fireEvent.click(screen.getByRole("button", { name: "Advanced transaction management" }));
+  fireEvent.click(screen.getByRole("button", { name: "Reopen transaction" }));
+  fireEvent.change(screen.getByLabelText("Resume point"), {
+    target: { value: "pending_agreement" },
+  });
+  fireEvent.change(screen.getByLabelText("Reopening reason"), {
+    target: { value: "Retain this reason" },
+  });
+  fireEvent.click(screen.getAllByRole("button", { name: "Reopen transaction" }).slice(-1)[0]!);
+  await screen.findByRole("alert");
+  expect(screen.getByLabelText("Reopening reason")).toHaveValue("Retain this reason");
+  expect(screen.getByLabelText("Resume point")).toHaveValue("pending_agreement");
+  vi.restoreAllMocks();
+});
+it("never exposes reopening for an invalidated auction result", async () => {
+  const t = terminalFixture("failed");
+  t.management!.canReopen = false;
+  t.management!.reopenBlockedReason = "The finalized auction result was invalidated.";
+  t.resultCorrections = [{ at: "2026-09-20", reason: "Invalid result" }];
+  vi.mocked(request).mockResolvedValue(t);
+  workspace();
+  await screen.findByText("Finalized auction result");
+  fireEvent.click(screen.getByRole("button", { name: "Advanced transaction management" }));
+  expect(screen.queryByRole("button", { name: "Reopen transaction" })).not.toBeInTheDocument();
+  expect(screen.getByText(/Reopening unavailable/)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Correct record" })).toBeInTheDocument();
 });

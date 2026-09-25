@@ -235,3 +235,49 @@ it("keeps a property address intact when a suggestion only identifies an area", 
   });
   expect(screen.getByText(/This identifies an area, not the property/)).toBeInTheDocument();
 });
+
+it("saves a manually placed pin even when address lookup is unavailable and restores it after reopening", async () => {
+  let stored = listing();
+  delete stored.basicInformation.location.latitude;
+  delete stored.basicInformation.location.longitude;
+  vi.mocked(request).mockImplementation(async (url, init) => {
+    if (url.includes("/locations/")) throw new Error("Request failed: 404");
+    if (init?.method === "PATCH") {
+      const patch = JSON.parse(String(init.body));
+      stored = {
+        ...stored,
+        revision: 4,
+        basicInformation: {
+          ...stored.basicInformation,
+          location: { ...stored.basicInformation.location, ...patch.basicInformation.location },
+        },
+      };
+    }
+    return structuredClone(stored);
+  });
+  const updated = vi.fn();
+  const view = render(<ListingEditorSection listing={stored} onUpdated={updated} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Set location on map" }));
+  expect(screen.getByRole("button", { name: "Save property changes" })).toBeDisabled();
+  expect(
+    screen.getByText(/Confirm the property location on the map, or cancel/),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("Choose the property location on the map"), {
+    clientX: 100,
+    clientY: 100,
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Confirm property location" }));
+  expect(screen.getByText("Manually positioned")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Save property changes" }));
+  await waitFor(() => expect(updated).toHaveBeenCalled());
+  expect(stored.basicInformation.location).toMatchObject({
+    coordinateSource: "manual",
+    latitude: expect.any(Number),
+    longitude: expect.any(Number),
+  });
+  const pin = { ...stored.basicInformation.location };
+  view.unmount();
+  render(<ListingEditorSection listing={stored} onUpdated={updated} />);
+  expect(await screen.findByText("Manually positioned")).toBeInTheDocument();
+  expect(stored.basicInformation.location).toEqual(pin);
+});

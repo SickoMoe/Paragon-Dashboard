@@ -131,3 +131,10 @@ it("parses explicit full addresses and accepts valid zero coordinates", () => {
   expect(hasCoordinates({ latitude: 0, longitude: 0 })).toBe(true);
   expect(hasCoordinates({ latitude: 10, longitude: undefined })).toBe(false);
 });
+
+it("does not mistake state and ZIP for the city when the city is omitted", () => {
+  expect(enteredAddress("212 Cape Conroe Drive, TX 77356", initial)).toEqual({
+    ...initial,
+    address: "212 Cape Conroe Drive",
+  });
+});

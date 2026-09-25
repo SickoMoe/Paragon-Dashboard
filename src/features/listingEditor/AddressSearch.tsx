@@ -7,11 +7,13 @@ export default function AddressSearch({
   setForm,
   disabled,
   errors = {},
+  onPendingChange,
 }: {
   form: ListingFormState;
   setForm: Dispatch<SetStateAction<ListingFormState>>;
   disabled?: boolean;
   errors?: FormErrors;
+  onPendingChange?: (pending: boolean) => void;
 }) {
   return (
     <PropertyLocation
@@ -24,6 +26,7 @@ export default function AddressSearch({
         longitude: form.longitude === "" ? undefined : Number(form.longitude),
         coordinateSource: form.coordinateSource,
       }}
+      onPendingChange={onPendingChange}
       request={request}
       disabled={disabled}
       errors={errors}

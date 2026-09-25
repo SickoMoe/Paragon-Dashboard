@@ -10,6 +10,7 @@ export function ListingFormFields({
   onStepChange,
   errors = {},
   onBusyChange,
+  onLocationPendingChange,
   disabled = false,
 }: {
   form: ListingFormState;
@@ -18,15 +19,17 @@ export function ListingFormFields({
   onStepChange?: (step: number) => void;
   errors?: FormErrors;
   onBusyChange?: (busy: boolean) => void;
+  onLocationPendingChange?: (pending: boolean) => void;
   disabled?: boolean;
   showWorkflow?: boolean;
 }) {
   const [localStep, setLocalStep] = useState(0);
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
+  const [positioning, setPositioning] = useState(false);
   const step = controlledStep ?? localStep;
   const go = (value: number) => {
-    if (uploading) return;
+    if (uploading || positioning) return;
     setLocalStep(value);
     onStepChange?.(value);
   };
@@ -79,7 +82,7 @@ export function ListingFormFields({
             key={label}
             type="button"
             aria-current={step === i ? "step" : undefined}
-            disabled={uploading || disabled}
+            disabled={uploading || positioning || disabled}
             onClick={() => go(i)}
           >
             {label}
@@ -121,6 +124,10 @@ export function ListingFormFields({
             <AddressSearch
               form={form}
               setForm={setForm}
+              onPendingChange={(pending) => {
+                setPositioning(pending);
+                onLocationPendingChange?.(pending);
+              }}
               disabled={disabled}
               errors={{
                 address: message("address"),
@@ -250,13 +257,17 @@ export function ListingFormFields({
       <div className="listing-editor__navigation">
         <button
           type="button"
-          disabled={step === 0 || disabled || uploading}
+          disabled={step === 0 || disabled || uploading || positioning}
           onClick={() => go(step - 1)}
         >
           Back
         </button>
         {step < 4 ? (
-          <button type="button" disabled={disabled || uploading} onClick={() => go(step + 1)}>
+          <button
+            type="button"
+            disabled={disabled || uploading || positioning}
+            onClick={() => go(step + 1)}
+          >
             Continue →
           </button>
         ) : null}

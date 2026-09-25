@@ -26,6 +26,7 @@ export default function ListingCreation({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [positioning, setPositioning] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
@@ -62,19 +63,20 @@ export default function ListingCreation({
     };
   }, []);
   useEffect(() => {
-    notify.current?.(dirty || busy || uploading);
+    notify.current?.(dirty || busy || uploading || positioning);
     return () => notify.current?.(false);
-  }, [dirty, busy, uploading]);
+  }, [dirty, busy, uploading, positioning]);
   useEffect(() => {
-    if (!dirty && !uploading && !busy) return;
+    if (!dirty && !uploading && !positioning && !busy) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty, uploading, busy]);
+  }, [dirty, uploading, positioning, busy]);
   async function save(complete = false) {
+    if (positioning) return;
     const issues = validateForm(form, complete);
     setErrors(issues);
     setError("");
@@ -126,7 +128,7 @@ export default function ListingCreation({
       {saved ? (
         <button
           type="button"
-          disabled={busy || uploading}
+          disabled={positioning || busy || uploading}
           onClick={() => {
             if (
               dirty &&
@@ -162,6 +164,7 @@ export default function ListingCreation({
           onStepChange={setStep}
           errors={errors}
           onBusyChange={setUploading}
+          onLocationPendingChange={setPositioning}
           disabled={busy}
         />
       )}
@@ -175,6 +178,11 @@ export default function ListingCreation({
           {notice}
         </p>
       ) : null}
+      {positioning && (
+        <p role="status" className="listing-warning">
+          Confirm the property location on the map, or cancel the adjustment, before saving.
+        </p>
+      )}
       <footer className="listing-editor__footer">
         <span role="status">
           {busy
@@ -189,7 +197,7 @@ export default function ListingCreation({
         </span>
         <button
           type="button"
-          disabled={loading || busy || uploading || Boolean(saved && !dirty)}
+          disabled={positioning || loading || busy || uploading || Boolean(saved && !dirty)}
           className={step < 4 ? "listing-primary" : ""}
           onClick={() => void save()}
         >
@@ -199,7 +207,7 @@ export default function ListingCreation({
           <button
             type="button"
             className="listing-primary"
-            disabled={loading || busy || uploading}
+            disabled={positioning || loading || busy || uploading}
             onClick={() => void save(true)}
           >
             Create property

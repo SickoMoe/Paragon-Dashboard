@@ -33,7 +33,11 @@ export function enteredAddress(text: string, current: PropertyLocation): Propert
   return {
     ...current,
     address: parts[0],
-    city: parts.length >= 3 ? parts.slice(1, -1).join(", ") : parts[1],
+    city: tail
+      ? parts.length >= 3
+        ? parts.slice(1, -1).join(", ")
+        : current.city
+      : parts.slice(1).join(", "),
     state: tail ? tail[1].toUpperCase() : current.state,
     zipcode: tail?.[2] || current.zipcode,
   };

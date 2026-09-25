@@ -36,6 +36,7 @@ export function ListingEditorSection({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [positioning, setPositioning] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
@@ -67,19 +68,20 @@ export function ListingEditorSection({
     void load();
   }, [load]);
   useEffect(() => {
-    notify.current?.(dirty || uploading || saving);
+    notify.current?.(dirty || uploading || positioning || saving);
     return () => notify.current?.(false);
-  }, [dirty, uploading, saving]);
+  }, [dirty, uploading, positioning, saving]);
   useEffect(() => {
-    if (!dirty && !uploading && !saving) return;
+    if (!dirty && !uploading && !positioning && !saving) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty, uploading, saving]);
+  }, [dirty, uploading, positioning, saving]);
   async function save(confirmed = false) {
+    if (positioning) return;
     const validation = validateForm(form, false, baseline);
     setErrors(validation);
     setError("");
@@ -144,6 +146,7 @@ export function ListingEditorSection({
           onStepChange={setStep}
           errors={errors}
           onBusyChange={setUploading}
+          onLocationPendingChange={setPositioning}
           disabled={saving}
         />
       ) : (
@@ -193,13 +196,18 @@ export function ListingEditorSection({
           </button>
           <button
             type="button"
-            disabled={saving || uploading || !reason.trim()}
+            disabled={saving || uploading || positioning || !reason.trim()}
             onClick={() => void save(true)}
           >
             Confirm correction & save
           </button>
         </div>
       ) : null}
+      {positioning && (
+        <p role="status" className="listing-warning">
+          Confirm the property location on the map, or cancel the adjustment, before saving.
+        </p>
+      )}
       <footer className="listing-editor__footer">
         <span role="status">
           {saving
@@ -214,7 +222,7 @@ export function ListingEditorSection({
         </span>
         <button
           type="button"
-          disabled={!dirty || saving || uploading || loading}
+          disabled={!dirty || saving || uploading || positioning || loading}
           onClick={() => {
             setForm(baseline);
             setImpact(null);
@@ -228,7 +236,14 @@ export function ListingEditorSection({
           type="button"
           className="listing-primary"
           disabled={
-            !dirty || saving || uploading || loading || !loaded || conflict || Boolean(impact)
+            !dirty ||
+            saving ||
+            uploading ||
+            positioning ||
+            loading ||
+            !loaded ||
+            conflict ||
+            Boolean(impact)
           }
           onClick={() => void save()}
         >

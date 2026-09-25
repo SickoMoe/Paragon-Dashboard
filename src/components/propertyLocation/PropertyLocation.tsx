@@ -13,12 +13,14 @@ export type LocationRequest = <T>(url: string, options?: RequestInit) => Promise
 export default function PropertyLocation({
   value,
   onChange,
+  onPendingChange,
   request,
   disabled = false,
   errors = {},
 }: {
   value: Location;
   onChange: (location: Location) => void;
+  onPendingChange?: (pending: boolean) => void;
   request: LocationRequest;
   disabled?: boolean;
   errors?: Partial<Record<keyof Location, string>>;
@@ -43,6 +45,12 @@ export default function PropertyLocation({
       mounted.current = false;
     };
   }, []);
+  const pendingCallback = useRef(onPendingChange);
+  pendingCallback.current = onPendingChange;
+  useEffect(() => {
+    pendingCallback.current?.(editingPin);
+    return () => pendingCallback.current?.(false);
+  }, [editingPin]);
   const mapped = hasCoordinates(value);
   useEffect(() => {
     setMatches([]);
@@ -142,7 +150,7 @@ export default function PropertyLocation({
     onChange({ ...value, ...pin, coordinateSource: "manual" });
     setAddressChanged(false);
     setEditingPin(false);
-    setMessage("Property location confirmed.");
+    setMessage("Pin confirmed. Save your property changes to update map results.");
     setReverse(null);
     try {
       const result = await request<{ location: Place | null }>(

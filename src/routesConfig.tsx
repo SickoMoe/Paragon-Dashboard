@@ -1,3 +1,4 @@
+import { AssetsPage, AssetWorkspace, OpportunitiesPage, OpportunityWorkspace, ListingWorkspace } from "./features/assets/PortfolioPages";
 import TransactionsPage, { TransactionWorkspace } from "./features/transactions/TransactionsPage";
 import GenericRouteConfig from "./interfaces/iGenericRouteConfig";
 import DashboardLayout from "./routes/dashboard/layout";
@@ -16,6 +17,11 @@ export const routesConfig: GenericRouteConfig[] = [
   element: <DashboardLayout />, // navbar + shell
   children: [
     auctionRoute,
+    { path: "assets", element: <AssetsPage /> },
+    { path: "assets/:assetId", element: <AssetWorkspace /> },
+    { path: "opportunities", element: <OpportunitiesPage /> },
+    { path: "opportunities/:opportunityId", element: <OpportunityWorkspace /> },
+    { path: "listings/:listingId", element: <ListingWorkspace /> },
     { path: "transactions", element: <TransactionsPage /> },
     { path: "transactions/:transactionId", element: <TransactionWorkspace /> },
     messageRoute,

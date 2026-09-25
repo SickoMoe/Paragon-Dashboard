@@ -14,6 +14,8 @@ type Props = {
 };
 
 const mainLinks: NavItem[] = [
+  { to: "/assets", label: "Assets" },
+  { to: "/opportunities", label: "Opportunities" },
   { to: "/auctions", label: "Auctions" },
   { to: "/transactions", label: "Transactions" },
   { to: "/messages", label: "Messages" },

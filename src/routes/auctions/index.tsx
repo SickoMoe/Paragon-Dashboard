@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet, useLoaderData, useNavigate } from "react-router-dom";
+import { Outlet, useLoaderData, useNavigate, useSearchParams } from "react-router-dom";
 import { AuctionsToolbar } from "../../features/auctions/components/AuctionsToolbar";
 import { AuctionsTable } from "../../features/auctions/components/AuctionTable";
 import { AuctionPageProvider, useDashboardPageContext } from "./auctionPageContext";
@@ -24,7 +24,13 @@ export default function AuctionsPage() {
 }
 
 function AuctionsPageContent() {
+  const [params, setParams] = useSearchParams();
   const [creating, setCreating] = useState(false);
+  const requestedListingId = params.get("create") === "1" ? params.get("listing") || undefined : undefined;
+  const closeCreation = () => {
+    setCreating(false);
+    setParams(current => { const next = new URLSearchParams(current); next.delete("create"); next.delete("listing"); return next; }, { replace: true });
+  };
   const [creationMode, setCreationMode] = useState<"existing" | "new">("existing");
   const navigate = useNavigate();
   const { auctions, filteredAuctions, tab, setTab, search, setSearch, handleCreated } =
@@ -88,10 +94,11 @@ function AuctionsPageContent() {
 
       <Outlet />
 
-      {creating && (
+      {(creating || requestedListingId) && (
         <CreateAuctionModal
-          initialMode={creationMode}
-          onClose={() => setCreating(false)}
+          initialMode={requestedListingId ? "existing" : creationMode}
+          initialListingId={requestedListingId}
+          onClose={closeCreation}
           onSubmit={async (input) => {
             const listing = input.listing ? await createPropertyListing(input.listing) : null;
             const listingId = listing?.listingId ?? input.listingId;

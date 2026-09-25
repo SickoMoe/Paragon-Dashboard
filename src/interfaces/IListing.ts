@@ -5,6 +5,7 @@ export interface IListing {
   reviewState?: { approvedReviewRequestId?: string; hasNewerMaterialChanges?: boolean };
   ownerAccountId: string;
   listingId: string;
+  assetId?: string;
   moderationStatus?: "pending" | "approved" | "denied" | "removed";
   workflowStatus?: "draft" | "submitted" | "published" | "archived";
   basicInformation: {

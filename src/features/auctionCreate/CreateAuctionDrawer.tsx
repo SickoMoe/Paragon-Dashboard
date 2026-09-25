@@ -123,8 +123,10 @@ export function CreateAuctionModal({
   onClose,
   onSubmit,
   initialMode = "existing",
+  initialListingId,
 }: {
   initialMode?: "existing" | "new";
+  initialListingId?: string;
   onClose: () => void;
   onSubmit: (input: CreateAuctionInput) => void | Promise<void>;
 }) {
@@ -176,6 +178,7 @@ export function CreateAuctionModal({
           onCancel={close}
           onDirtyChange={setDirty}
           initialMode={initialMode}
+          initialListingId={initialListingId}
           busy={loading}
           onPropertyCreated={initialMode === "new" ? onClose : undefined}
         />
@@ -223,17 +226,19 @@ export function CreateAuctionForm({
   onDirtyChange,
   onPropertyCreated,
   initialMode = "existing",
+  initialListingId,
   busy = false,
 }: {
   onPropertyCreated?: () => void;
   busy?: boolean;
   initialMode?: "existing" | "new";
+  initialListingId?: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSubmit: (data: CreateAuctionInput) => void;
   onCancel: () => void;
 }) {
   const [form, setForm] = useState<CreateAuctionInput>({
-    listingId: "",
+    listingId: initialListingId || "",
     startingBid: 0,
     bidIncrement: 1000,
     currency: "USD",

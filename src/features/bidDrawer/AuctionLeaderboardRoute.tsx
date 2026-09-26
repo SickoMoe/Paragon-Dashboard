@@ -1,10 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLoaderData, useMatch, useNavigate, useParams } from "react-router-dom";
 import { BidsPanel } from "./BidsPanel";
-import type {
-  AuctionLeaderboardDTO,
-  BidDTO,
-} from "../auctions/services/auctionBidApi";
+import type { AuctionLeaderboardDTO, BidDTO } from "../auctions/services/auctionBidApi";
 import {
   fetchAuctionBids,
   recordAdminBid,
@@ -26,10 +23,14 @@ export default function AuctionLeaderboardRoute() {
     setLeaderboard(initialLeaderboard);
   }, [initialLeaderboard]);
 
+  const version = useRef(0);
+  const mutationInFlight = useRef(false);
   const refreshManagementView = useCallback(async () => {
-    if (!auctionId) return;
+    if (!auctionId || mutationInFlight.current) return;
+    const call = ++version.current;
     try {
-      setLeaderboard(await fetchAuctionBids(auctionId));
+      const next = await fetchAuctionBids(auctionId);
+      if (call === version.current) setLeaderboard(next);
     } catch {
       // Keep the latest visible state; manual actions still surface errors.
     }
@@ -37,14 +38,15 @@ export default function AuctionLeaderboardRoute() {
 
   const handleRealtimeEvent = useCallback(
     (event: AuctionRealtimeEvent) => {
-      if (!auctionId || event.auctionId !== auctionId) return;
-      const realtimeLeaderboard = event.payload?.leaderboard;
-      if (realtimeLeaderboard) {
-        setLeaderboard(realtimeLeaderboard);
-      }
+      if (!auctionId || (event.auctionId && event.auctionId !== auctionId)) return;
+      // Realtime data is anonymized for public viewers; retain the admin contract.
       if (
-        event.type === "bid.created" ||
-        event.type === "auction.leaderboardUpdated"
+        [
+          "bid.created",
+          "auction.leaderboardUpdated",
+          "auction.statusChanged",
+          "auction.updated",
+        ].includes(event.type)
       ) {
         void refreshManagementView();
       }
@@ -53,6 +55,16 @@ export default function AuctionLeaderboardRoute() {
   );
 
   useAuctionRealtime(handleRealtimeEvent);
+  useEffect(() => {
+    const refresh = () => void refreshManagementView();
+    const timer = window.setInterval(refresh, 5000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      version.current++;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [refreshManagementView]);
 
   const handleRecordBid = async (input: {
     bidderProfileId: string;
@@ -60,36 +72,38 @@ export default function AuctionLeaderboardRoute() {
     adminNote?: string;
   }) => {
     if (!auctionId) return;
+    mutationInFlight.current = true;
+    version.current++;
     setMutating(true);
     setMutationError(null);
     try {
       setLeaderboard(await recordAdminBid(auctionId, input));
     } catch (cause) {
-      setMutationError(
-        cause instanceof Error ? cause.message : "Unable to record bid",
-      );
+      setMutationError(cause instanceof Error ? cause.message : "Unable to record bid");
       throw cause;
     } finally {
+      mutationInFlight.current = false;
       setMutating(false);
     }
   };
 
   const handleVoidBid = async (bid: BidDTO) => {
     if (!auctionId) return;
-    const reason = window.prompt(
-      `Why should the bid for ${Number(bid.amount).toLocaleString()} be voided?`,
-    )?.trim();
+    const reason = window
+      .prompt(`Why should the bid for ${Number(bid.amount).toLocaleString()} be voided?`)
+      ?.trim();
     if (!reason) return;
 
+    mutationInFlight.current = true;
+    version.current++;
     setMutating(true);
     setMutationError(null);
     try {
       setLeaderboard(await voidAuctionBid(auctionId, bid.id, reason));
     } catch (cause) {
-      setMutationError(
-        cause instanceof Error ? cause.message : "Unable to void bid",
-      );
+      setMutationError(cause instanceof Error ? cause.message : "Unable to void bid");
     } finally {
+      mutationInFlight.current = false;
       setMutating(false);
     }
   };
@@ -133,7 +147,7 @@ export default function AuctionLeaderboardRoute() {
             transition: "transform 220ms ease, opacity 160ms ease",
           }}
         >
-          <Outlet context={leaderboard.bids} />
+          <Outlet context={[...leaderboard.bids, ...(leaderboard.voidedBids || [])]} />
         </div>
       </div>
     </>

@@ -29,9 +29,12 @@ export function BidsPanel({
   }) => void | Promise<void>;
   onVoidBid?: (bid: BidDTO) => void | Promise<void>;
 }) {
-  const minimum =
-    Number(leaderboard.currentBid ?? leaderboard.openingBid ?? 0) +
-    Number(leaderboard.incrementAmount ?? 0);
+  const minimum = leaderboard.minimumBid ?? ((leaderboard.bids?.length ?? 0)>0 ? leaderboard.currentBid+leaderboard.incrementAmount : leaderboard.openingBid);
+  const [now,setNow]=useState(Date.now());
+  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer);},[]);
+  const auction=leaderboard.auction;
+  const open=!auction || auction.status==='live' && Date.parse(auction.startDate)<=now && now<Date.parse(auction.endDate);
+  const leader=leaderboard.bids[0];
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [bidderProfileId, setBidderProfileId] = useState("");
   const [amount, setAmount] = useState(String(minimum));
@@ -45,7 +48,7 @@ export function BidsPanel({
 
   const submit = async () => {
     if (!onRecordBid) return;
-    await onRecordBid({
+    try { await onRecordBid({
       bidderProfileId: bidderProfileId.trim(),
       amount: Number(amount),
       adminNote: adminNote.trim() || undefined,
@@ -53,6 +56,7 @@ export function BidsPanel({
     setBidderProfileId("");
     setAdminNote("");
     setShowRecordForm(false);
+    } catch { /* Parent keeps the error and entered values visible. */ }
   };
 
   const canSubmit =
@@ -69,6 +73,13 @@ export function BidsPanel({
           <Metric label="Increment" value={money(leaderboard.incrementAmount)} />
         </section>
 
+        <section style={styles.monitoring} aria-label="Live auction status">
+          <strong>{auction ? auction.status.replace(/_/g,' ') : 'Auction activity'}</strong>
+          <p>Leading bidder: {leader?.bidderProfileId || 'No accepted bids'}</p>
+          <p>{leaderboard.bidCount ?? leaderboard.bids.length} accepted bids · {leaderboard.bids.filter(b=>b.source==='auto').length} recent AutoBid responses</p>
+          <p>Minimum next bid: {money(minimum)}</p>
+          {auction&&<><p>Starts: {formatDate(auction.startDate)}</p><p>Ends: {formatDate(auction.endDate)}</p>{!open&&<p>Bidding is closed or not currently available.</p>}</>}
+        </section>
         {leaderboard.monitoring ? (
           <section style={styles.monitoring}>
             <div style={styles.monitoringHeader}>
@@ -114,7 +125,7 @@ export function BidsPanel({
                 : ""}
             </div>
           </div>
-          {onRecordBid ? (
+          {onRecordBid && open ? (
             <button
               type="button"
               style={showRecordForm ? secondaryBtn : primaryBtn}
@@ -125,7 +136,7 @@ export function BidsPanel({
           ) : null}
         </div>
 
-        {showRecordForm ? (
+        {showRecordForm && open ? (
           <section style={styles.recordForm}>
             <label style={styles.field}>
               <span style={styles.label}>Bidder profile ID</span>

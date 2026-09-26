@@ -5,6 +5,7 @@ import type { AuctionOverview } from "../auctions/types";
 import { request } from "../../core/api/request";
 const mocks = vi.hoisted(() => ({ navigate: vi.fn(), revalidate: vi.fn() }));
 vi.mock("react-router-dom", () => ({
+  Link: ({to, children}: {to: string; children: React.ReactNode}) => <a href={to}>{children}</a>,
   useNavigate: () => mocks.navigate,
   useRevalidator: () => ({ revalidate: mocks.revalidate }),
 }));
@@ -159,4 +160,10 @@ describe("auction preparation workflow", () => {
       screen.getByRole("button", { name: /Accepted title document Blocked/ }),
     ).toBeInTheDocument();
   });
+});
+
+it('keeps the launched auction and bid-management links visible after a reload', () => {
+  render(<AuctionPreparation row={{...row, auctionDraft: undefined, auction: {...row.auction, id: 'live-auction', status: 'live'}}} onUpdate={vi.fn()} onReplace={vi.fn()} />);
+  expect(screen.getByRole('link', {name: /Open bidder auction page/i})).toHaveAttribute('href', expect.stringContaining('/auctions/live-auction'));
+  expect(screen.getByRole('link', {name: /Manage live bids/i})).toHaveAttribute('href', '/auctions/live-auction/leaderboard');
 });

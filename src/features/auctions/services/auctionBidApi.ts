@@ -20,6 +20,9 @@ export type AuctionLeaderboardDTO = {
   openingBid: number;
   incrementAmount: number;
   currentBid: number;
+  bidCount?: number;
+  minimumBid?: number;
+  auction?: {status:string;startDate:string;endDate:string};
   hasReserve?: boolean;
   reserveMet?: boolean;
   bids: BidDTO[];

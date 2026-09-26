@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useNavigate, useRevalidator } from "react-router-dom";
+import { Link, useNavigate, useRevalidator } from "react-router-dom";
 import type { AuctionOverview } from "../auctions/types";
 import type { IAuction } from "../../interfaces/IAuction";
 import { request } from "../../core/api/request";
@@ -412,6 +412,7 @@ export default function AuctionPreparation({
           </span>
         </div>
       </header>
+      {!row.auctionDraft && ['scheduled','live','paused','ended','archived'].includes(status) && <div className="preparation__notice" role="status"><strong>{status==='scheduled'?'Auction scheduled':status==='live'?'Auction is live':status==='ended'?'Auction ended':'Auction management'}</strong><p><a href={`${(import.meta.env.VITE_PUBLIC_SITE_URL || 'http://127.0.0.1:4000').replace(/\/$/,'')}/auctions/${row.auction.id}`} target="_blank" rel="noreferrer">Open bidder auction page →</a> · <Link to={`/auctions/${row.auction.id}/leaderboard`}>Manage live bids</Link>{['ended','archived'].includes(status)&&<> · <Link to={`/transactions?auction=${row.auction.id}`}>Transaction / closing</Link></>}</p></div>}
       <nav className="preparation__steps" aria-label="Auction preparation sections">
         {sections.map((item, index) => (
           <button

@@ -100,3 +100,49 @@ export function preparationStatus(row: AuctionOverview, now = Date.now()) {
     return "Needs auction setup";
   return Date.parse(row.auction.startDate ?? "") > now ? "Ready to schedule" : "Ready to publish";
 }
+
+export function checkGuidance(code: string): { title: string; detail: string; action: string } {
+  if (code === "listing_approved")
+    return {
+      title: "Approve the listing",
+      detail:
+        "Review the saved property or pending seller submission and approve it for this auction.",
+      action: "Review & approve listing",
+    };
+  if (code === "auction_terms")
+    return {
+      title: "Review the auction terms",
+      detail:
+        "The approved listing needs auction terms. Review and save the terms here before launch.",
+      action: "Review listing & terms",
+    };
+  if (code === "authority_verified")
+    return {
+      title: "Verify seller authority",
+      detail: "Confirm the seller’s right to sell this property.",
+      action: "Verify seller authority",
+    };
+  if (code.startsWith("document:"))
+    return {
+      title: `Accept the ${code.slice(9).replace(/_/g, " ")} document`,
+      detail: "Review the uploaded file in Verification, or request it from the seller.",
+      action: "Review required documents",
+    };
+  const fields: Record<string, string> = {
+    starting_bid: "Set the opening bid",
+    increment: "Set the bid increment",
+    start_date: "Choose the start time",
+    end_date: "Choose a future end time",
+    reserve: "Check the reserve",
+    private_access: "Select authorized bidders",
+    listingId: "Choose a property",
+  };
+  return {
+    title: fields[code] || "Complete auction setup",
+    detail:
+      code === "end_date"
+        ? "The auction must end after its start time and later than now."
+        : "Update this setting in Auction setup. Your other settings are kept.",
+    action: "Edit auction setup",
+  };
+}

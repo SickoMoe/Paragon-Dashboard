@@ -5,7 +5,9 @@ import type { AuctionOverview } from "../auctions/types";
 import { request } from "../../core/api/request";
 const mocks = vi.hoisted(() => ({ navigate: vi.fn(), revalidate: vi.fn() }));
 vi.mock("react-router-dom", () => ({
-  Link: ({to, children}: {to: string; children: React.ReactNode}) => <a href={to}>{children}</a>,
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
   useNavigate: () => mocks.navigate,
   useRevalidator: () => ({ revalidate: mocks.revalidate }),
 }));
@@ -112,7 +114,7 @@ describe("auction preparation workflow", () => {
     render(<AuctionPreparation row={row} onUpdate={vi.fn()} onReplace={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: /4 Review & launch/ }));
     const blocker = await screen.findByRole("button", {
-      name: /Seller authority verified Blocked/,
+      name: /^Verify seller authority$/,
     });
     fireEvent.click(blocker);
     expect(screen.getByRole("heading", { name: "Verification", level: 2 })).toBeInTheDocument();
@@ -131,7 +133,7 @@ describe("auction preparation workflow", () => {
       target: { value: "" },
     });
     expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save & continue" }));
     await waitFor(() => expect(update).toHaveBeenCalled());
     const saved = vi.mocked(request).mock.calls.find(([, init]) => init?.method === "PATCH");
     expect(JSON.parse(String(saved?.[1]?.body))).not.toHaveProperty("startingBid");
@@ -156,14 +158,28 @@ describe("auction preparation workflow", () => {
     await review();
     fireEvent.click(screen.getByRole("button", { name: "Schedule Auction" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Documents changed");
-    expect(
-      screen.getByRole("button", { name: /Accepted title document Blocked/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Accept the title document/ })).toBeInTheDocument();
   });
 });
 
-it('keeps the launched auction and bid-management links visible after a reload', () => {
-  render(<AuctionPreparation row={{...row, auctionDraft: undefined, auction: {...row.auction, id: 'live-auction', status: 'live'}}} onUpdate={vi.fn()} onReplace={vi.fn()} />);
-  expect(screen.getByRole('link', {name: /Open bidder auction page/i})).toHaveAttribute('href', expect.stringContaining('/auctions/live-auction'));
-  expect(screen.getByRole('link', {name: /Manage live bids/i})).toHaveAttribute('href', '/auctions/live-auction/leaderboard');
+it("keeps the launched auction and bid-management links visible after a reload", () => {
+  render(
+    <AuctionPreparation
+      row={{
+        ...row,
+        auctionDraft: undefined,
+        auction: { ...row.auction, id: "live-auction", status: "live" },
+      }}
+      onUpdate={vi.fn()}
+      onReplace={vi.fn()}
+    />,
+  );
+  expect(screen.getByRole("link", { name: /Open bidder auction page/i })).toHaveAttribute(
+    "href",
+    expect.stringContaining("/auctions/live-auction"),
+  );
+  expect(screen.getByRole("link", { name: /Manage live bids/i })).toHaveAttribute(
+    "href",
+    "/auctions/live-auction/leaderboard",
+  );
 });

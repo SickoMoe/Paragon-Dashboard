@@ -1,3 +1,4 @@
+import { ListingApprovalPanel } from "./ListingApprovalPanel";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRevalidator } from "react-router-dom";
 import type { AuctionOverview } from "../auctions/types";
@@ -26,6 +27,7 @@ import { ListingEditorSection } from "../listingEditor/ListingEditorSection";
 import { useAuctionDrawerCloseGuard } from "../auctionDrawer/AuctionDrawerRoute";
 import {
   accountIds,
+  checkGuidance,
   configurationChecks,
   destination,
   setupFor,
@@ -75,6 +77,9 @@ export default function AuctionPreparation({
   const [notice, setNotice] = useState("");
   const [verification, setVerification] = useState<Liquidation | null>(null);
   const [propertyDirty, setPropertyDirty] = useState(false);
+  const [reviewingListing, setReviewingListing] = useState(false);
+  const [approvalDirty, setApprovalDirty] = useState(false);
+  const propertyPending = propertyDirty || approvalDirty;
   const [editingProperty, setEditingProperty] = useState(false);
   const latest = useRef(row);
   latest.current = row;
@@ -91,19 +96,19 @@ export default function AuctionPreparation({
   const closeGuard = useCallback(
     () =>
       !busy &&
-      (!(dirty || propertyDirty) || window.confirm("Discard unsaved preparation changes?")),
-    [busy, dirty, propertyDirty],
+      (!(dirty || propertyPending) || window.confirm("Discard unsaved preparation changes?")),
+    [busy, dirty, propertyPending],
   );
   useAuctionDrawerCloseGuard(closeGuard);
   useEffect(() => {
-    if (!dirty && !propertyDirty && !busy) return;
+    if (!dirty && !propertyPending && !busy) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty, propertyDirty, busy]);
+  }, [dirty, propertyPending, busy]);
   const refreshReadiness = useCallback(async () => {
     const seq = ++sequence.current;
     const current = latest.current;
@@ -168,9 +173,11 @@ export default function AuctionPreparation({
     setNotice("");
   }
   function visit(next: Section) {
-    if (section === "property" && next !== "property" && propertyDirty) {
+    if (section === "property" && next !== "property" && propertyPending) {
       if (!window.confirm("Discard unsaved property corrections?")) return;
       setEditingProperty(false);
+      setReviewingListing(false);
+      setApprovalDirty(false);
     }
     setSection(next);
     window.requestAnimationFrame(() => document.getElementById(`preparation-${next}`)?.focus());
@@ -187,7 +194,15 @@ export default function AuctionPreparation({
     setError("");
     void refreshReadiness();
   }
-  async function save() {
+  function resolveCheck(check: Check) {
+    const target = destination(check.code);
+    visit(target);
+    if (target === "property" && row.auctionDraft) {
+      setEditingProperty(false);
+      setReviewingListing(true);
+    }
+  }
+  async function save(continueAfter = false) {
     setBusy("Saving changes…");
     setError("");
     setNotice("");
@@ -251,6 +266,7 @@ export default function AuctionPreparation({
       setBaseline(form);
       setSavedVersion(next.auctionDraft?.updatedAt ?? next.auction.updatedAt);
       setNotice("All auction setup changes saved.");
+      if (continueAfter) visit("launch");
       await refreshReadiness();
       revalidate();
     } catch (cause) {
@@ -260,7 +276,7 @@ export default function AuctionPreparation({
     }
   }
   async function launch() {
-    if (dirty || propertyDirty || changedElsewhere) {
+    if (dirty || propertyPending || changedElsewhere) {
       setError("Save or reload your changes before launching.");
       return;
     }
@@ -314,7 +330,7 @@ export default function AuctionPreparation({
     }
   }
   async function advanced(kind: string) {
-    if (dirty || propertyDirty) {
+    if (dirty || propertyPending) {
       setError("Save your changes before using management actions.");
       return;
     }
@@ -390,7 +406,7 @@ export default function AuctionPreparation({
     Math.abs(location.longitude) <= 180;
   const title = row.listing.basicInformation.title || "Untitled property";
   const heading = sections.find((item) => item.id === section)!;
-  const primarySave = dirty || !ready;
+  const primarySave = dirty;
   return (
     <div className="preparation">
       <header className="preparation__hero">
@@ -412,7 +428,37 @@ export default function AuctionPreparation({
           </span>
         </div>
       </header>
-      {!row.auctionDraft && ['scheduled','live','paused','ended','archived'].includes(status) && <div className="preparation__notice" role="status"><strong>{status==='scheduled'?'Auction scheduled':status==='live'?'Auction is live':status==='ended'?'Auction ended':'Auction management'}</strong><p><a href={`${(import.meta.env.VITE_PUBLIC_SITE_URL || 'http://127.0.0.1:4000').replace(/\/$/,'')}/auctions/${row.auction.id}`} target="_blank" rel="noreferrer">Open bidder auction page →</a> · <Link to={`/auctions/${row.auction.id}/leaderboard`}>Manage live bids</Link>{['ended','archived'].includes(status)&&<> · <Link to={`/transactions?auction=${row.auction.id}`}>Transaction / closing</Link></>}</p></div>}
+      {!row.auctionDraft &&
+        ["scheduled", "live", "paused", "ended", "archived"].includes(status) && (
+          <div className="preparation__notice" role="status">
+            <strong>
+              {status === "scheduled"
+                ? "Auction scheduled"
+                : status === "live"
+                  ? "Auction is live"
+                  : status === "ended"
+                    ? "Auction ended"
+                    : "Auction management"}
+            </strong>
+            <p>
+              <a
+                href={`${(import.meta.env.VITE_PUBLIC_SITE_URL || "http://127.0.0.1:4000").replace(/\/$/, "")}/auctions/${row.auction.id}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open bidder auction page →
+              </a>{" "}
+              · <Link to={`/auctions/${row.auction.id}/leaderboard`}>Manage live bids</Link>
+              {["ended", "archived"].includes(status) && (
+                <>
+                  {" "}
+                  ·{" "}
+                  <Link to={`/transactions?auction=${row.auction.id}`}>Transaction / closing</Link>
+                </>
+              )}
+            </p>
+          </div>
+        )}
       <nav className="preparation__steps" aria-label="Auction preparation sections">
         {sections.map((item, index) => (
           <button
@@ -421,8 +467,18 @@ export default function AuctionPreparation({
             onClick={() => visit(item.id)}
           >
             <span>{index + 1}</span>
-            <strong>{item.title}</strong>
-            <small>{item.description}</small>
+            <strong>
+              {item.id === "launch" && !isPreparation ? "Auction status" : item.title}
+            </strong>
+            <small>
+              {item.id === "launch"
+                ? !isPreparation
+                  ? preparationStatus(row)
+                  : blockers.length
+                    ? `${blockers.length} to resolve`
+                    : "Ready to launch"
+                : `${checks.filter((c) => destination(c.code) === item.id && !c.satisfied).length ? "Needs attention · " : ""}${item.description}`}
+            </small>
           </button>
         ))}
       </nav>
@@ -450,20 +506,54 @@ export default function AuctionPreparation({
             <p className="preparation__eyebrow">
               Step {sections.findIndex((s) => s.id === section) + 1} of 4
             </p>
-            <h2>{heading.title}</h2>
+            <h2>{section === "launch" && !isPreparation ? "Auction status" : heading.title}</h2>
           </div>
           {section !== "launch" ? (
             <button onClick={() => visit("launch")}>View launch checklist</button>
           ) : null}
         </div>
-        {section === "property" ? (
+        {section === "property" && reviewingListing && row.auctionDraft ? (
+          <ListingApprovalPanel
+            draftId={row.auctionDraft.id}
+            onDirtyChange={setApprovalDirty}
+            onCancel={() => {
+              if (!approvalDirty || window.confirm("Discard unsaved review terms?")) {
+                setReviewingListing(false);
+                setApprovalDirty(false);
+              }
+            }}
+            onEdit={() => {
+              if (
+                !approvalDirty ||
+                window.confirm("Discard unsaved review terms and edit the property?")
+              ) {
+                setReviewingListing(false);
+                setApprovalDirty(false);
+                setEditingProperty(true);
+              }
+            }}
+            onApproved={(listing, draft) => {
+              const next = { ...row, listing, auctionDraft: draft };
+              latest.current = next;
+              onUpdate(next);
+              setSavedVersion(draft.updatedAt);
+              setReviewingListing(false);
+              setApprovalDirty(false);
+              setNotice("Listing approved. Your pricing and schedule are kept.");
+              void refreshReadiness();
+              revalidate();
+              setSection("launch");
+            }}
+          />
+        ) : null}
+        {section === "property" && !reviewingListing ? (
           <>
             <dl className="preparation__facts">
               <Fact
                 label="Listing approval"
                 value={
                   checks.find((c) => c.code === "listing_approved")?.satisfied
-                    ? "Approved listing snapshot"
+                    ? "Listing approved for auction"
                     : checking
                       ? "Checking…"
                       : "Needs listing approval"
@@ -481,7 +571,7 @@ export default function AuctionPreparation({
               <Fact label="Property type" value={row.listing.basicInformation.type} />
               <Fact
                 label="Map location"
-                value={hasCoordinates ? "Property coordinates available" : "Missing location data"}
+                value={hasCoordinates ? "Property coordinates available" : "No map pin · optional"}
               />
             </dl>
             <div className="preparation__callout">
@@ -490,17 +580,23 @@ export default function AuctionPreparation({
               <p>
                 {checks.find((c) => c.code === "auction_terms")?.satisfied
                   ? "Approved auction terms are available."
-                  : "Auction terms must be included in the approved listing review."}
+                  : "Review the listing and approve its auction terms below."}
               </p>
               <button
-                onClick={() => navigateSafely(`/messages?listingId=${row.auction.listingId}`)}
+                disabled={dirty}
+                onClick={() =>
+                  row.auctionDraft
+                    ? setReviewingListing(true)
+                    : navigateSafely(`/messages?listingId=${row.auction.listingId}`)
+                }
               >
-                Review listing & terms
+                {row.auctionDraft ? "Review & approve listing" : "View listing review"}
               </button>
             </div>
             {!hasCoordinates ? (
               <p className="preparation__warning">
-                This property will not have a map marker until its actual location is corrected.
+                A map pin is optional for launch. Add the real location if you want this property to
+                appear on the map.
               </p>
             ) : null}
             <button
@@ -665,20 +761,24 @@ export default function AuctionPreparation({
           <>
             <div className={`preparation__callout ${ready ? "is-ready" : ""}`}>
               <h3>
-                {checking
-                  ? "Checking readiness…"
-                  : ready
-                    ? "Ready to launch"
-                    : "Needs attention before launch"}
+                {!isPreparation
+                  ? preparationStatus(row)
+                  : checking
+                    ? "Checking readiness…"
+                    : ready
+                      ? "Ready to launch"
+                      : `${blockers.length} ${blockers.length === 1 ? "step" : "steps"} left before launch`}
               </h3>
               <p>
-                {dirty
-                  ? "The checklist includes your unsaved setup. Save changes before launching."
-                  : ready
-                    ? future
-                      ? "This auction will be scheduled for the start time below."
-                      : "This auction can begin accepting bids immediately."
-                    : "Select an incomplete item to resolve it."}
+                {!isPreparation
+                  ? "Review the saved configuration and manage this auction below."
+                  : dirty
+                    ? "The checklist includes your unsaved setup. Save changes before launching."
+                    : ready
+                      ? future
+                        ? "This auction will be scheduled for the start time below."
+                        : "This auction can begin accepting bids immediately."
+                      : "Complete the items below. Each action opens the place where you can fix it."}
               </p>
               {readinessError ? <p role="alert">{readinessError}</p> : null}
               <button disabled={checking || Boolean(busy)} onClick={() => void refreshReadiness()}>
@@ -690,28 +790,45 @@ export default function AuctionPreparation({
                 Verification could not be confirmed. Refresh the checklist before launch.
               </p>
             ) : null}
-            <ul className="preparation__checklist">
-              {checks.map((check) => (
-                <li key={check.code}>
-                  <button onClick={() => visit(destination(check.code))}>
-                    <span className={check.satisfied ? "is-complete" : "is-blocked"}>
-                      {check.satisfied ? "✓" : "!"}
-                    </span>
-                    <span>
+            {blockers.length > 0 && (
+              <ul className="preparation__checklist" aria-label="Items to resolve">
+                {blockers.map((check) => {
+                  const guidance = checkGuidance(check.code);
+                  return (
+                    <li key={check.code}>
+                      <button
+                        disabled={
+                          Boolean(busy) || (dirty && destination(check.code) === "property")
+                        }
+                        onClick={() => resolveCheck(check)}
+                      >
+                        <span className="is-blocked" aria-hidden="true">
+                          !
+                        </span>
+                        <span>
+                          <strong>{guidance.title}</strong>
+                          <small>{guidance.detail}</small>
+                          <span className="preparation__actionLabel">{guidance.action} →</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <details className="preparation__completed">
+              <summary>{checks.filter((c) => c.satisfied).length} checks complete</summary>
+              <ul>
+                {checks
+                  .filter((c) => c.satisfied)
+                  .map((check) => (
+                    <li key={check.code}>
+                      <span aria-hidden="true">✓ </span>
                       {check.label}
-                      <small>
-                        {check.satisfied
-                          ? "Complete"
-                          : destination(check.code) === "setup"
-                            ? "Needs attention · open auction setup"
-                            : `Blocked · open ${destination(check.code)}`}
-                      </small>
-                    </span>
-                    <span aria-hidden="true">→</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    </li>
+                  ))}
+              </ul>
+            </details>
             <h3>Final auction configuration</h3>
             <dl className="preparation__facts">
               <Fact label="Opening bid" value={money(form.startingBid)} />
@@ -752,7 +869,7 @@ export default function AuctionPreparation({
             {actions.map((action) => (
               <button
                 key={action}
-                disabled={Boolean(busy) || dirty || propertyDirty}
+                disabled={Boolean(busy) || dirty || propertyPending}
                 onClick={() => void advanced(action)}
               >
                 {action === "request-changes"
@@ -763,49 +880,63 @@ export default function AuctionPreparation({
           </div>
         </details>
       ) : null}
-      <footer className="preparation__footer">
-        <div role="status">
-          <strong>{busy || (dirty ? "Unsaved changes" : "Setup saved")}</strong>
-          <small>
-            {propertyDirty
-              ? "Save property corrections before continuing."
-              : checking
-                ? "Checking launch requirements…"
-                : ready
-                  ? "Launch requirements complete"
-                  : `${blockers.length} ${blockers.length === 1 ? "item needs" : "items need"} attention`}
-          </small>
-        </div>
-        {section !== "launch" ? (
-          <button
-            disabled={Boolean(busy) || propertyDirty}
-            onClick={() => visit(sections[sections.findIndex((s) => s.id === section) + 1].id)}
-          >
-            Continue →
-          </button>
-        ) : null}
-        {!locked && (primarySave || !isPreparation) ? (
-          <button
-            className="preparation__primary"
-            disabled={!dirty || Boolean(busy) || changedElsewhere || propertyDirty}
-            onClick={() => void save()}
-          >
-            Save changes
-          </button>
-        ) : canLaunch && ready ? (
-          <button
-            className="preparation__primary"
-            disabled={Boolean(busy) || checking || dirty || propertyDirty || changedElsewhere}
-            onClick={() => (section === "launch" ? void launch() : visit("launch"))}
-          >
-            {section === "launch" ? launchLabel : "Review & launch"}
-          </button>
-        ) : isPreparation ? (
-          <button disabled={Boolean(busy)} onClick={() => visit("launch")}>
-            Resolve launch blockers
-          </button>
-        ) : null}
-      </footer>
+      {!(section === "property" && reviewingListing) && (
+        <footer className="preparation__footer">
+          <div role="status">
+            <strong>{busy || (dirty ? "Unsaved changes" : "Setup saved")}</strong>
+            <small>
+              {propertyPending
+                ? "Save property corrections before continuing."
+                : checking
+                  ? "Checking launch requirements…"
+                  : ready
+                    ? "Launch requirements complete"
+                    : `${blockers.length} ${blockers.length === 1 ? "item needs" : "items need"} attention`}
+            </small>
+          </div>
+          {section !== "property" && (
+            <button
+              disabled={Boolean(busy)}
+              onClick={() => visit(sections[sections.findIndex((s) => s.id === section) - 1].id)}
+            >
+              ← Back
+            </button>
+          )}
+          {!locked && primarySave ? (
+            <button
+              className="preparation__primary"
+              disabled={Boolean(busy) || propertyPending || changedElsewhere}
+              onClick={() => void save(section === "setup")}
+            >
+              {section === "setup" ? "Save & continue" : "Save auction setup"}
+            </button>
+          ) : section !== "launch" ? (
+            <button
+              className="preparation__primary"
+              disabled={Boolean(busy) || propertyPending}
+              onClick={() => visit(sections[sections.findIndex((s) => s.id === section) + 1].id)}
+            >
+              Continue →
+            </button>
+          ) : canLaunch && ready ? (
+            <button
+              className="preparation__primary"
+              disabled={Boolean(busy) || checking || propertyPending || changedElsewhere}
+              onClick={() => void launch()}
+            >
+              {launchLabel}
+            </button>
+          ) : isPreparation && blockers.length > 0 ? (
+            <button
+              className="preparation__primary"
+              disabled={Boolean(busy) || checking || propertyPending}
+              onClick={() => resolveCheck(blockers[0])}
+            >
+              {checkGuidance(blockers[0].code).action}
+            </button>
+          ) : null}
+        </footer>
+      )}
     </div>
   );
 }

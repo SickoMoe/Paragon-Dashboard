@@ -329,3 +329,87 @@
     font-size: 23px;
   }
 }
+/* Keep navigation and next actions in view while reviewing a long property. */
+.preparation__steps {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  box-shadow: 0 3px 12px #00000008;
+}
+.preparation__checklist button {
+  padding: 16px;
+  align-items: flex-start;
+}
+.preparation__checklist button > span:last-child {
+  margin-left: 0;
+}
+.preparation__checklist small {
+  font-size: 12px;
+  max-width: 65ch;
+  margin-top: 3px;
+}
+.preparation__actionLabel {
+  display: block;
+  color: var(--dash-accent, #344d40);
+  margin-top: 9px;
+  font-size: 12px;
+}
+.preparation__completed {
+  padding: 12px 0;
+  margin: 0 0 18px;
+  color: var(--dash-muted);
+  border-bottom: 1px solid var(--dash-border);
+}
+.preparation__completed summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.preparation__completed ul {
+  list-style: none;
+  padding: 8px 0 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  font-size: 12px;
+}
+.preparation__completed li span {
+  color: #315b43;
+}
+.preparation__reviewPhotos {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 0 16px;
+}
+.preparation__reviewPhotos img {
+  width: 150px;
+  height: 105px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.preparation__confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 20px 0;
+}
+.preparation__reviewActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.preparation__approval details {
+  margin-bottom: 20px;
+}
+@media (max-width: 650px) {
+  .preparation__completed ul {
+    grid-template-columns: 1fr;
+  }
+  .preparation__steps {
+    gap: 0;
+  }
+  .preparation__steps button {
+    padding: 8px;
+  }
+}
